@@ -1,0 +1,162 @@
+# Excursion_GPT Deployment Configuration Template
+# Copy this file to deploy.config and modify the values for your environment
+
+# Server Configuration
+SERVER_IP="your-server-ip"
+DOMAIN_NAME="your-domain.com"
+SSH_USER="deploy-user"
+SSH_PORT="22"
+
+# Application Configuration
+APP_NAME="excursion-gpt"
+APP_DIR="/var/www/excursion-gpt"
+APP_USER="www-data"
+APP_GROUP="www-data"
+
+# Database Configuration
+DB_NAME="3D_Excursion"
+DB_USER="excursion_user"
+# DB_PASSWORD will be auto-generated if not specified
+# DB_PASSWORD="your_secure_password_here"
+
+# JWT Configuration
+# JWT_SECRET will be auto-generated if not specified
+# JWT_SECRET="your_very_long_jwt_secret_key_here"
+
+# MinIO Configuration (Optional)
+MINIO_ENABLED=false
+MINIO_ENDPOINT="localhost:9000"
+MINIO_ACCESS_KEY="admin"
+MINIO_SECRET_KEY="admin12345"
+MINIO_BUCKET_NAME="models"
+MINIO_USE_SSL=false
+
+# SSL Configuration
+SSL_ENABLED=true
+SSL_EMAIL="admin@your-domain.com"
+
+# Backup Configuration
+BACKUP_ENABLED=true
+BACKUP_RETENTION_DAYS=30
+BACKUP_DIR="/var/backups/excursion-gpt"
+
+# Monitoring Configuration
+MONITORING_ENABLED=true
+HEALTH_CHECK_ENDPOINT="/health"
+HEALTH_CHECK_INTERVAL=300
+
+# Logging Configuration
+LOG_LEVEL="Information"
+LOG_RETENTION_DAYS=14
+LOG_DIR="/var/log/excursion-gpt"
+
+# Performance Configuration
+MAX_UPLOAD_SIZE="100MB"
+REQUEST_TIMEOUT=600
+WORKER_PROCESSES=2
+
+# Security Configuration
+ENABLE_FIREWALL=true
+ALLOWED_PORTS="22 80 443"
+DISABLE_ROOT_LOGIN=true
+
+# Deployment Options
+SKIP_DATABASE_SETUP=false
+SKIP_SSL_SETUP=false
+SKIP_BACKUP_SETUP=false
+FORCE_DEPLOYMENT=false
+
+# Git Configuration (if using Git deployment)
+GIT_REPO_URL="https://github.com/your-username/Excursion_GPT.git"
+GIT_BRANCH="main"
+GIT_DEPLOY_KEY_PATH=""
+
+# Email Notifications (Optional)
+EMAIL_NOTIFICATIONS=false
+SMTP_SERVER="smtp.your-domain.com"
+SMTP_PORT="587"
+SMTP_USERNAME="noreply@your-domain.com"
+SMTP_PASSWORD=""
+NOTIFICATION_EMAILS="admin@your-domain.com"
+
+# Environment Variables
+# Additional environment variables to set
+ENVIRONMENT_VARS=(
+    "ASPNETCORE_ENVIRONMENT=Production"
+    "DOTNET_PRINT_TELEMETRY_MESSAGE=false"
+    "ASPNETCORE_URLS=http://localhost:5000"
+)
+
+# Custom Nginx Configuration (Optional)
+# Add custom Nginx directives here
+NGINX_EXTRA_CONFIG=""
+# Example:
+# NGINX_EXTRA_CONFIG="client_max_body_size 100M;"
+
+# Custom Systemd Configuration (Optional)
+# Add custom systemd directives here
+SYSTEMD_EXTRA_CONFIG=""
+# Example:
+# SYSTEMD_EXTRA_CONFIG="LimitNOFILE=65536"
+
+# Pre-deployment Hooks (Optional)
+# Commands to run before deployment
+PRE_DEPLOYMENT_HOOKS=(
+    # "echo 'Running pre-deployment checks...'"
+    # "./scripts/validate-config.sh"
+)
+
+# Post-deployment Hooks (Optional)
+# Commands to run after deployment
+POST_DEPLOYMENT_HOOKS=(
+    # "echo 'Running post-deployment tasks...'"
+    # "./scripts/clear-cache.sh"
+    # "./scripts/send-notification.sh"
+)
+
+# Database Migration Options
+AUTO_MIGRATE=true
+MIGRATION_TIMEOUT=300
+ROLLBACK_ON_FAILURE=false
+
+# Health Check Configuration
+HEALTH_CHECK_TIMEOUT=30
+HEALTH_CHECK_RETRIES=3
+HEALTH_CHECK_DELAY=5
+
+# Backup Configuration
+AUTO_BACKUP=true
+BACKUP_SCHEDULE="0 2 * * *"  # Daily at 2 AM
+
+# Monitoring Endpoints
+MONITORING_ENDPOINTS=(
+    "/health"
+    "/api/buildings/around-point/55.7558/37.6173/20000000-0000-0000-0000-000000000001"
+)
+
+# Security Headers
+SECURITY_HEADERS=true
+CSP_ENABLED=true
+HSTS_ENABLED=true
+
+# Rate Limiting
+RATE_LIMITING_ENABLED=true
+RATE_LIMIT="100r/m"  # 100 requests per minute
+RATE_LIMIT_BURST="10"
+
+# Notes:
+# 1. Copy this file to deploy.config
+# 2. Replace all placeholder values with your actual configuration
+# 3. Remove comments for values you want to set
+# 4. Passwords and secrets will be auto-generated if not specified
+# 5. Use absolute paths for file references
+# 6. Test configuration with: ./deploy.sh --validate-config
+
+# Required fields for basic deployment:
+# - SERVER_IP
+# - DOMAIN_NAME (or set SSL_ENABLED=false)
+# - SSH_USER
+
+# Optional but recommended:
+# - DB_PASSWORD (or let it auto-generate)
+# - JWT_SECRET (or let it auto-generate)

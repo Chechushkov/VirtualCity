@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "iisSettings": {
+    "windowsAuthentication": false,
+    "anonymousAuthentication": true,
+    "iisExpress": {
+      "applicationUrl": "http://10.1.0.165:46398",
+      "sslPort": 44369
+    }
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5432;Database=your_db_name;Username=your_user;Password=your_password"
+  },
+  "Jwt": {
+    "Key": "ThisIsAStrongSecretKeyForJWTAuthenticationAndItShouldBeLongEnough", 
+    "Issuer": "Excursion_GPT",
+    "Audience": "Excursion_GPTClients"
+  },
+  "Minio": {
+    "Endpoint": "localhost:9000",
+    "AccessKey": "minioadmin", 
+    "SecretKey": "minioadmin", 
+    "BucketName": "models"
+  },
+  "profiles": {
+    "Excursion_GPT": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "launchUrl": "swagger",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:7211;http://localhost:5211",
+      "dotnetRunMessages": true
+    },
+    "IIS Express": {
+      "commandName": "IISExpress",
+      "launchBrowser": true,
+      "launchUrl": "swagger",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "Docker": {
+      "commandName": "Docker",
+      "launchBrowser": true,
+      "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}/swagger",
+      "publishAllPorts": true,
+      "useSSL": true
+    }
+  }
+}
