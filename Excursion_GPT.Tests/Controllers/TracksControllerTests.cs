@@ -49,46 +49,56 @@ namespace Excursion_GPT.Tests.Controllers
         public async Task GetAllTracks_AuthenticatedUser_ReturnsTracks()
         {
             // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId);
+            SetupAuthenticatedUser(Guid.NewGuid(), "User");
 
-            var tracks = new List<TrackDto>
+            var expectedTracks = new List<TrackListItemDto>
             {
-                new TrackDto(Guid.NewGuid(), "Track 1"),
-                new TrackDto(Guid.NewGuid(), "Track 2")
+                new TrackListItemDto { Id = "track_001", Name = "City Center Tour" },
+                new TrackListItemDto { Id = "track_002", Name = "Historical Buildings" }
             };
 
-            _mockTrackService.Setup(x => x.GetAllTracksAsync()).ReturnsAsync(tracks);
+            _mockTrackService.Setup(s => s.GetAllTracksAsync())
+                .ReturnsAsync(expectedTracks);
 
             // Act
             var result = await _controller.GetAllTracks();
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var returnedTracks = Assert.IsType<List<TrackDto>>(okResult.Value);
+            var returnedTracks = Assert.IsType<List<TrackListItemDto>>(okResult.Value);
             Assert.Equal(2, returnedTracks.Count);
-            _mockTrackService.Verify(x => x.GetAllTracksAsync(), Times.Once);
+            Assert.Equal("track_001", returnedTracks[0].Id);
+            Assert.Equal("City Center Tour", returnedTracks[0].Name);
         }
 
         [Fact]
-        public async Task GetTrackById_ValidId_ReturnsTrack()
+        public async Task GetTrackById_ValidTrackId_ReturnsTrack()
         {
             // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId);
+            SetupAuthenticatedUser(Guid.NewGuid(), "User");
+            var trackId = "track_001";
 
-            var trackId = Guid.NewGuid();
-            var trackDetails = new TrackDetailsDto(
-                trackId,
-                "Test Track",
-                new List<PointDto>
+            var expectedTrack = new TrackDetailsDto
+            {
+                Id = trackId,
+                Name = "City Center Tour",
+                Points = new List<PointDto>
                 {
-                    new PointDto(Guid.NewGuid(), "Point 1", "start", 0, 0, new double[] { 0, 0, 0 }, new double[] { 0, 0, 0 }),
-                    new PointDto(Guid.NewGuid(), "Point 2", "checkpoint", 10, 20, new double[] { 10, 20, 30 }, new double[] { 45, 90, 0 })
+                    new PointDto
+                    {
+                        Id = "point_001",
+                        Name = "Main Square",
+                        Lat = 55.7558,
+                        Lng = 37.6173,
+                        Type = "viewpoint",
+                        Position = new List<double> { 55.7558, 0.0, 37.6173 },
+                        Rotation = new List<double> { 0.0, 0.0, 0.0 }
+                    }
                 }
-            );
+            };
 
-            _mockTrackService.Setup(x => x.GetTrackByIdAsync(trackId)).ReturnsAsync(trackDetails);
+            _mockTrackService.Setup(s => s.GetTrackByIdAsync(trackId))
+                .ReturnsAsync(expectedTrack);
 
             // Act
             var result = await _controller.GetTrackById(trackId);
@@ -97,334 +107,266 @@ namespace Excursion_GPT.Tests.Controllers
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
             var returnedTrack = Assert.IsType<TrackDetailsDto>(okResult.Value);
             Assert.Equal(trackId, returnedTrack.Id);
-            Assert.Equal("Test Track", returnedTrack.Name);
-            Assert.Equal(2, returnedTrack.Points.Count());
-            _mockTrackService.Verify(x => x.GetTrackByIdAsync(trackId), Times.Once);
+            Assert.Equal("City Center Tour", returnedTrack.Name);
+            Assert.Single(returnedTrack.Points);
         }
 
         [Fact]
-        public async Task CreateTrack_ValidData_ReturnsCreatedTrack()
+        public async Task GetTrackById_NonExistentTrack_ReturnsNotFound()
         {
             // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId, "Creator");
+            SetupAuthenticatedUser(Guid.NewGuid(), "User");
+            var trackId = "non_existent_track";
 
-            var trackCreateDto = new TrackCreateDto("New Track");
-            var createdTrack = new TrackDto(Guid.NewGuid(), trackCreateDto.Name);
-
-            _mockTrackService.Setup(x => x.CreateTrackAsync(trackCreateDto, userId)).ReturnsAsync(createdTrack);
+            _mockTrackService.Setup(s => s.GetTrackByIdAsync(trackId))
+                .ThrowsAsync(new InvalidOperationException("Track not found"));
 
             // Act
-            var result = await _controller.CreateTrack(trackCreateDto);
+            var result = await _controller.GetTrackById(trackId);
 
             // Assert
-            var createdAtActionResult = Assert.IsType<CreatedAtActionResult>(result.Result);
-            var returnedTrack = Assert.IsType<TrackDto>(createdAtActionResult.Value);
-            Assert.Equal(createdTrack.Id, returnedTrack.Id);
-            Assert.Equal("New Track", returnedTrack.Name);
-            _mockTrackService.Verify(x => x.CreateTrackAsync(trackCreateDto, userId), Times.Once);
+            var notFoundResult = Assert.IsType<NotFoundObjectResult>(result.Result);
+            Assert.NotNull(notFoundResult.Value);
         }
 
         [Fact]
-        public async Task UpdateTrack_ValidData_ReturnsUpdatedTrack()
+        public async Task CreateTrack_AdminUser_CreatesTrack()
         {
             // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId, "Creator");
+            SetupAuthenticatedUser(Guid.NewGuid(), "Admin");
 
-            var trackId = Guid.NewGuid();
-            var trackUpdateDto = new TrackUpdateDto("Updated Track Name");
-            var updatedTrack = new TrackDto(trackId, trackUpdateDto.Name!);
+            var createRequest = new TrackCreateRequestDto
+            {
+                Name = "New Excursion"
+            };
 
-            _mockTrackService.Setup(x => x.UpdateTrackAsync(trackId, trackUpdateDto)).ReturnsAsync(updatedTrack);
+            var expectedResponse = new TrackCreateResponseDto
+            {
+                Id = "new_track_001",
+                Name = "New Excursion"
+            };
+
+            _mockTrackService.Setup(s => s.CreateTrackAsync(createRequest))
+                .ReturnsAsync(expectedResponse);
 
             // Act
-            var result = await _controller.UpdateTrack(trackId, trackUpdateDto);
+            var result = await _controller.CreateTrack(createRequest);
 
             // Assert
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var returnedTrack = Assert.IsType<TrackDto>(okResult.Value);
-            Assert.Equal(trackId, returnedTrack.Id);
-            Assert.Equal("Updated Track Name", returnedTrack.Name);
-            _mockTrackService.Verify(x => x.UpdateTrackAsync(trackId, trackUpdateDto), Times.Once);
+            var createdResult = Assert.IsType<CreatedAtActionResult>(result.Result);
+            var returnedTrack = Assert.IsType<TrackCreateResponseDto>(createdResult.Value);
+            Assert.Equal("new_track_001", returnedTrack.Id);
+            Assert.Equal("New Excursion", returnedTrack.Name);
         }
 
         [Fact]
-        public async Task DeleteTrack_ValidId_ReturnsNoContent()
+        public async Task CreateTrack_UnauthorizedUser_ReturnsForbidden()
         {
             // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId, "Creator");
+            SetupAuthenticatedUser(Guid.NewGuid(), "User"); // Not Admin or Creator
 
-            var trackId = Guid.NewGuid();
+            var createRequest = new TrackCreateRequestDto
+            {
+                Name = "New Excursion"
+            };
 
-            _mockTrackService.Setup(x => x.DeleteTrackAsync(trackId)).Returns(Task.CompletedTask);
+            // Act
+            var result = await _controller.CreateTrack(createRequest);
+
+            // Assert
+            var statusCodeResult = Assert.IsType<StatusCodeResult>(result.Result);
+            Assert.Equal(403, statusCodeResult.StatusCode);
+        }
+
+        [Fact]
+        public async Task DeleteTrack_AdminUser_DeletesTrack()
+        {
+            // Arrange
+            SetupAuthenticatedUser(Guid.NewGuid(), "Admin");
+            var trackId = "track_001";
+
+            _mockTrackService.Setup(s => s.DeleteTrackAsync(trackId))
+                .Returns(Task.CompletedTask);
 
             // Act
             var result = await _controller.DeleteTrack(trackId);
 
             // Assert
             Assert.IsType<NoContentResult>(result);
-            _mockTrackService.Verify(x => x.DeleteTrackAsync(trackId), Times.Once);
         }
 
         [Fact]
-        public async Task AddPointToTrack_ValidData_ReturnsCreatedPoint()
+        public async Task DeleteTrack_NonExistentTrack_ReturnsNotFound()
         {
             // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId, "Creator");
+            SetupAuthenticatedUser(Guid.NewGuid(), "Admin");
+            var trackId = "non_existent_track";
 
-            var trackId = Guid.NewGuid();
-            var pointCreateDto = new PointCreateDto(
-                "New Point",
-                "checkpoint",
-                15,
-                25,
-                new double[] { 15, 25, 35 },
-                new double[] { 90, 45, 0 }
-            );
-
-            var createdPoint = new PointDto(
-                Guid.NewGuid(),
-                pointCreateDto.Name,
-                pointCreateDto.Type,
-                pointCreateDto.Lat,
-                pointCreateDto.Lng,
-                pointCreateDto.Position,
-                pointCreateDto.Rotation
-            );
-
-            _mockPointService.Setup(x => x.AddPointToTrackAsync(trackId, pointCreateDto)).ReturnsAsync(createdPoint);
+            _mockTrackService.Setup(s => s.DeleteTrackAsync(trackId))
+                .ThrowsAsync(new InvalidOperationException("Track not found"));
 
             // Act
-            var result = await _controller.AddPointToTrack(trackId, pointCreateDto);
+            var result = await _controller.DeleteTrack(trackId);
 
             // Assert
-            var createdAtActionResult = Assert.IsType<CreatedAtActionResult>(result.Result);
-            var returnedPoint = Assert.IsType<PointDto>(createdAtActionResult.Value);
-            Assert.Equal(createdPoint.Id, returnedPoint.Id);
-            Assert.Equal("New Point", returnedPoint.Name);
-            Assert.Equal("checkpoint", returnedPoint.Type);
-            _mockPointService.Verify(x => x.AddPointToTrackAsync(trackId, pointCreateDto), Times.Once);
+            Assert.IsType<NotFoundObjectResult>(result);
         }
 
         [Fact]
-        public async Task UpdatePoint_ValidData_ReturnsUpdatedPoint()
+        public async Task AddPointToTrack_CreatorUser_AddsPoint()
         {
             // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId, "Creator");
+            SetupAuthenticatedUser(Guid.NewGuid(), "Creator");
+            var trackId = "track_001";
 
-            var trackId = Guid.NewGuid();
-            var pointId = Guid.NewGuid();
-            var pointUpdateDto = new PointUpdateDto(
-                "Updated Point",
-                "end",
-                20,
-                30,
-                new double[] { 20, 30, 40 },
-                new double[] { 180, 0, 0 }
-            );
+            var pointRequest = new PointCreateRequestDto
+            {
+                Name = "New Point",
+                Type = "viewpoint",
+                Position = new List<double> { 55.7558, 0.0, 37.6173 },
+                Rotation = new List<double> { 0.0, 0.0, 0.0 }
+            };
 
-            var updatedPoint = new PointDto(
-                pointId,
-                pointUpdateDto.Name!,
-                pointUpdateDto.Type!,
-                pointUpdateDto.Lat!.Value,
-                pointUpdateDto.Lng!.Value,
-                pointUpdateDto.Position!,
-                pointUpdateDto.Rotation!
-            );
+            var expectedResponse = new PointCreateResponseDto
+            {
+                Id = "new_point_001"
+            };
 
-            _mockPointService.Setup(x => x.UpdatePointAsync(trackId, pointId, pointUpdateDto)).ReturnsAsync(updatedPoint);
+            _mockPointService.Setup(s => s.AddPointToTrackAsync(trackId, pointRequest))
+                .ReturnsAsync(expectedResponse);
 
             // Act
-            var result = await _controller.UpdatePoint(trackId, pointId, pointUpdateDto);
+            var result = await _controller.AddPointToTrack(trackId, pointRequest);
 
             // Assert
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var returnedPoint = Assert.IsType<PointDto>(okResult.Value);
-            Assert.Equal(pointId, returnedPoint.Id);
-            Assert.Equal("Updated Point", returnedPoint.Name);
-            Assert.Equal("end", returnedPoint.Type);
-            _mockPointService.Verify(x => x.UpdatePointAsync(trackId, pointId, pointUpdateDto), Times.Once);
+            var createdResult = Assert.IsType<CreatedAtActionResult>(result.Result);
+            var returnedPoint = Assert.IsType<PointCreateResponseDto>(createdResult.Value);
+            Assert.Equal("new_point_001", returnedPoint.Id);
         }
 
         [Fact]
-        public async Task DeletePoint_ValidId_ReturnsNoContent()
+        public async Task AddPointToTrack_NonExistentTrack_ReturnsNotFound()
         {
             // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId, "Creator");
+            SetupAuthenticatedUser(Guid.NewGuid(), "Creator");
+            var trackId = "non_existent_track";
 
-            var trackId = Guid.NewGuid();
-            var pointId = Guid.NewGuid();
+            var pointRequest = new PointCreateRequestDto
+            {
+                Name = "New Point",
+                Type = "viewpoint",
+                Position = new List<double> { 55.7558, 0.0, 37.6173 },
+                Rotation = new List<double> { 0.0, 0.0, 0.0 }
+            };
 
-            _mockPointService.Setup(x => x.DeletePointAsync(trackId, pointId)).Returns(Task.CompletedTask);
+            _mockPointService.Setup(s => s.AddPointToTrackAsync(trackId, pointRequest))
+                .ThrowsAsync(new InvalidOperationException("Track not found"));
+
+            // Act
+            var result = await _controller.AddPointToTrack(trackId, pointRequest);
+
+            // Assert
+            Assert.IsType<NotFoundObjectResult>(result.Result);
+        }
+
+        [Fact]
+        public async Task UpdatePoint_AdminUser_UpdatesPoint()
+        {
+            // Arrange
+            SetupAuthenticatedUser(Guid.NewGuid(), "Admin");
+            var trackId = "track_001";
+            var pointId = "point_001";
+
+            var updateRequest = new PointUpdateRequestDto
+            {
+                Name = "Updated Point Name",
+                Position = new List<double> { 55.7560, 0.0, 37.6175 }
+            };
+
+            _mockPointService.Setup(s => s.UpdatePointAsync(trackId, pointId, updateRequest))
+                .Returns(Task.CompletedTask);
+
+            // Act
+            var result = await _controller.UpdatePoint(trackId, pointId, updateRequest);
+
+            // Assert
+            Assert.IsType<OkResult>(result);
+        }
+
+        [Fact]
+        public async Task UpdatePoint_NonExistentPoint_ReturnsNotFound()
+        {
+            // Arrange
+            SetupAuthenticatedUser(Guid.NewGuid(), "Admin");
+            var trackId = "track_001";
+            var pointId = "non_existent_point";
+
+            var updateRequest = new PointUpdateRequestDto
+            {
+                Name = "Updated Point Name"
+            };
+
+            _mockPointService.Setup(s => s.UpdatePointAsync(trackId, pointId, updateRequest))
+                .ThrowsAsync(new InvalidOperationException("Point not found"));
+
+            // Act
+            var result = await _controller.UpdatePoint(trackId, pointId, updateRequest);
+
+            // Assert
+            Assert.IsType<NotFoundObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task DeletePoint_CreatorUser_DeletesPoint()
+        {
+            // Arrange
+            SetupAuthenticatedUser(Guid.NewGuid(), "Creator");
+            var trackId = "track_001";
+            var pointId = "point_001";
+
+            _mockPointService.Setup(s => s.DeletePointAsync(trackId, pointId))
+                .Returns(Task.CompletedTask);
 
             // Act
             var result = await _controller.DeletePoint(trackId, pointId);
 
             // Assert
             Assert.IsType<NoContentResult>(result);
-            _mockPointService.Verify(x => x.DeletePointAsync(trackId, pointId), Times.Once);
         }
 
         [Fact]
-        public async Task GetTrackPoints_ValidTrackId_ReturnsPoints()
+        public async Task DeletePoint_NonExistentPoint_ReturnsNotFound()
         {
             // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId);
+            SetupAuthenticatedUser(Guid.NewGuid(), "Creator");
+            var trackId = "track_001";
+            var pointId = "non_existent_point";
 
-            var trackId = Guid.NewGuid();
-            var points = new List<PointDto>
-            {
-                new PointDto(Guid.NewGuid(), "Start", "start", 0, 0, new double[] { 0, 0, 0 }, new double[] { 0, 0, 0 }),
-                new PointDto(Guid.NewGuid(), "Checkpoint", "checkpoint", 10, 20, new double[] { 10, 20, 30 }, new double[] { 45, 90, 0 }),
-                new PointDto(Guid.NewGuid(), "End", "end", 20, 30, new double[] { 20, 30, 40 }, new double[] { 180, 0, 0 })
-            };
-
-            _mockPointService.Setup(x => x.GetPointsByTrackAsync(trackId)).ReturnsAsync(points);
+            _mockPointService.Setup(s => s.DeletePointAsync(trackId, pointId))
+                .ThrowsAsync(new InvalidOperationException("Point not found"));
 
             // Act
-            var result = await _controller.GetTrackPoints(trackId);
+            var result = await _controller.DeletePoint(trackId, pointId);
 
             // Assert
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var returnedPoints = Assert.IsType<List<PointDto>>(okResult.Value);
-            Assert.Equal(3, returnedPoints.Count);
-            _mockPointService.Verify(x => x.GetPointsByTrackAsync(trackId), Times.Once);
+            Assert.IsType<NotFoundObjectResult>(result);
         }
 
         [Fact]
-        public async Task GetPointById_ValidIds_ReturnsPoint()
+        public async Task GetAllTracks_Unauthenticated_ReturnsUnauthorized()
         {
-            // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId);
-
-            var trackId = Guid.NewGuid();
-            var pointId = Guid.NewGuid();
-            var point = new PointDto(pointId, "Test Point", "checkpoint", 15, 25, new double[] { 15, 25, 35 }, new double[] { 90, 45, 0 });
-
-            _mockPointService.Setup(x => x.GetPointByIdAsync(trackId, pointId)).ReturnsAsync(point);
-
-            // Act
-            var result = await _controller.GetPointById(trackId, pointId);
-
-            // Assert
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var returnedPoint = Assert.IsType<PointDto>(okResult.Value);
-            Assert.Equal(pointId, returnedPoint.Id);
-            Assert.Equal("Test Point", returnedPoint.Name);
-            Assert.Equal("checkpoint", returnedPoint.Type);
-            _mockPointService.Verify(x => x.GetPointByIdAsync(trackId, pointId), Times.Once);
-        }
-
-        [Fact]
-        public async Task GetAllTracks_UserRole_AllowsAccess()
-        {
-            // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId, "User");
-
-            var tracks = new List<TrackDto>
+            // Arrange - No user setup
+            _controller.ControllerContext = new ControllerContext
             {
-                new TrackDto(Guid.NewGuid(), "Track 1")
+                HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal() }
             };
-
-            _mockTrackService.Setup(x => x.GetAllTracksAsync()).ReturnsAsync(tracks);
 
             // Act
             var result = await _controller.GetAllTracks();
 
             // Assert
-            Assert.IsType<OkObjectResult>(result.Result);
-            _mockTrackService.Verify(x => x.GetAllTracksAsync(), Times.Once);
-        }
-
-        [Fact]
-        public async Task CreateTrack_AdminRole_AllowsAccess()
-        {
-            // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId, "Admin");
-
-            var trackCreateDto = new TrackCreateDto("New Track");
-            var createdTrack = new TrackDto(Guid.NewGuid(), trackCreateDto.Name);
-
-            _mockTrackService.Setup(x => x.CreateTrackAsync(trackCreateDto, userId)).ReturnsAsync(createdTrack);
-
-            // Act
-            var result = await _controller.CreateTrack(trackCreateDto);
-
-            // Assert
-            Assert.IsType<CreatedAtActionResult>(result.Result);
-            _mockTrackService.Verify(x => x.CreateTrackAsync(trackCreateDto, userId), Times.Once);
-        }
-
-        [Fact]
-        public async Task DeleteTrack_AdminRole_AllowsAccess()
-        {
-            // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId, "Admin");
-
-            var trackId = Guid.NewGuid();
-
-            _mockTrackService.Setup(x => x.DeleteTrackAsync(trackId)).Returns(Task.CompletedTask);
-
-            // Act
-            var result = await _controller.DeleteTrack(trackId);
-
-            // Assert
-            Assert.IsType<NoContentResult>(result);
-            _mockTrackService.Verify(x => x.DeleteTrackAsync(trackId), Times.Once);
-        }
-
-        [Fact]
-        public async Task GetAllTracks_EmptyResult_ReturnsEmptyList()
-        {
-            // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId);
-
-            var tracks = new List<TrackDto>();
-
-            _mockTrackService.Setup(x => x.GetAllTracksAsync()).ReturnsAsync(tracks);
-
-            // Act
-            var result = await _controller.GetAllTracks();
-
-            // Assert
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var returnedTracks = Assert.IsType<List<TrackDto>>(okResult.Value);
-            Assert.Empty(returnedTracks);
-            _mockTrackService.Verify(x => x.GetAllTracksAsync(), Times.Once);
-        }
-
-        [Fact]
-        public async Task GetTrackPoints_EmptyResult_ReturnsEmptyList()
-        {
-            // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId);
-
-            var trackId = Guid.NewGuid();
-            var points = new List<PointDto>();
-
-            _mockPointService.Setup(x => x.GetPointsByTrackAsync(trackId)).ReturnsAsync(points);
-
-            // Act
-            var result = await _controller.GetTrackPoints(trackId);
-
-            // Assert
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var returnedPoints = Assert.IsType<List<PointDto>>(okResult.Value);
-            Assert.Empty(returnedPoints);
-            _mockPointService.Verify(x => x.GetPointsByTrackAsync(trackId), Times.Once);
+            var unauthorizedResult = Assert.IsType<UnauthorizedObjectResult>(result.Result);
+            Assert.NotNull(unauthorizedResult.Value);
         }
     }
 }

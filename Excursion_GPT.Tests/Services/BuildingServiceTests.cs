@@ -2,327 +2,283 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using AutoMapper;
 using Excursion_GPT.Application.DTOs;
 using Excursion_GPT.Application.Services;
-using Excursion_GPT.Domain.Common;
-using Excursion_GPT.Domain.Entities;
-using Excursion_GPT.Infrastructure.Data;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
-using InvalidOperationException = System.InvalidOperationException;
 
 namespace Excursion_GPT.Tests.Services
 {
     public class BuildingServiceTests
     {
-        private readonly Mock<AppDbContext> _mockContext;
-        private readonly Mock<IMapper> _mockMapper;
         private readonly Mock<ILogger<BuildingService>> _mockLogger;
         private readonly BuildingService _buildingService;
 
         public BuildingServiceTests()
         {
-            _mockContext = new Mock<AppDbContext>(new DbContextOptions<AppDbContext>());
-            _mockMapper = new Mock<IMapper>();
             _mockLogger = new Mock<ILogger<BuildingService>>();
-
-            _buildingService = new BuildingService(
-                _mockContext.Object,
-                _mockMapper.Object
-            );
+            _buildingService = new BuildingService(null, _mockLogger.Object);
         }
 
-        [Fact(Skip = "Disabled - Mocking EF async operations is problematic. Use integration tests instead.")]
-        public async Task GetBuildingsAroundPointAsync_ValidCoordinates_ReturnsBuildings()
+        [Fact]
+        public async Task GetBuildingsAroundPointAsync_ValidRequest_ReturnsBuildings()
         {
             // Arrange
-            var latitude = 55.751244;
-            var longitude = 37.618423;
-            var trackId = Guid.NewGuid();
-
-            var buildings = new List<Building>
+            var request = new BuildingsAroundPointRequestDto
             {
-                new Building { Id = Guid.NewGuid(), Latitude = 55.751244, Longitude = 37.618423 },
-                new Building { Id = Guid.NewGuid(), Latitude = 55.755826, Longitude = 37.617300 }
+                Position = new PositionDto { X = 55.751244, Z = 37.618423 },
+                Distance = 100.0
             };
-
-            var mockBuildingsSet = new Mock<DbSet<Building>>();
-            mockBuildingsSet.As<IQueryable<Building>>().Setup(m => m.Provider).Returns(buildings.AsQueryable().Provider);
-            mockBuildingsSet.As<IQueryable<Building>>().Setup(m => m.Expression).Returns(buildings.AsQueryable().Expression);
-            mockBuildingsSet.As<IQueryable<Building>>().Setup(m => m.ElementType).Returns(buildings.AsQueryable().ElementType);
-            mockBuildingsSet.As<IQueryable<Building>>().Setup(m => m.GetEnumerator()).Returns(buildings.AsQueryable().GetEnumerator());
-
-            var mockTracksSet = new Mock<DbSet<Track>>();
-            var tracks = new List<Track> { new Track { Id = trackId } }.AsQueryable();
-            mockTracksSet.As<IQueryable<Track>>().Setup(m => m.Provider).Returns(tracks.Provider);
-            mockTracksSet.As<IQueryable<Track>>().Setup(m => m.Expression).Returns(tracks.Expression);
-            mockTracksSet.As<IQueryable<Track>>().Setup(m => m.ElementType).Returns(tracks.ElementType);
-            mockTracksSet.As<IQueryable<Track>>().Setup(m => m.GetEnumerator()).Returns(tracks.GetEnumerator());
-
-            _mockContext.Setup(c => c.Buildings).Returns(mockBuildingsSet.Object);
-            _mockContext.Setup(c => c.Tracks).Returns(mockTracksSet.Object);
-
-            var buildingResponseDtos = new List<BuildingResponseDto>
-            {
-                new BuildingResponseDto { Id = buildings[0].Id.ToString() },
-                new BuildingResponseDto { Id = buildings[1].Id.ToString() }
-            };
-
-            _mockMapper.Setup(m => m.Map<IEnumerable<BuildingResponseDto>>(It.IsAny<IEnumerable<Building>>()))
-                      .Returns(buildingResponseDtos);
 
             // Act
-            var result = await _buildingService.GetBuildingsAroundPointAsync(latitude, longitude, trackId);
+            var result = await _buildingService.GetBuildingsAroundPointAsync(request);
 
             // Assert
-            Assert.Equal(2, result.Count());
-            _mockContext.Verify(x => x.Buildings, Times.Once);
-            _mockContext.Verify(x => x.Tracks, Times.Once);
+            Assert.NotNull(result);
+            Assert.NotEmpty(result);
+
+            // Check that we have both standard and model buildings
+            var standardBuildings = result.OfType<object>().Where(b =>
+                b.GetType().GetProperty("nd") != null);
+            var modelBuildings = result.OfType<object>().Where(b =>
+                b.GetType().GetProperty("model") != null);
+
+            Assert.True(standardBuildings.Any() || modelBuildings.Any());
         }
 
-        [Fact(Skip = "Disabled - Mocking EF async operations is problematic. Use integration tests instead.")]
-        public async Task GetBuildingsAroundPointAsync_InvalidLatitude_ThrowsInvalidOperationException()
+        [Fact]
+        public async Task GetBuildingsAroundPointAsync_NorthPole_ThrowsInvalidOperationException()
         {
             // Arrange
-            var latitude = 91.0; // Invalid latitude
-            var longitude = 37.618423;
-            var trackId = Guid.NewGuid();
+            var request = new BuildingsAroundPointRequestDto
+            {
+                Position = new PositionDto { X = 90.0, Z = 37.618423 }, // North pole
+                Distance = 100.0
+            };
 
             // Act & Assert
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                _buildingService.GetBuildingsAroundPointAsync(latitude, longitude, trackId));
+                _buildingService.GetBuildingsAroundPointAsync(request));
         }
 
-        [Fact(Skip = "Disabled - Mocking EF async operations is problematic. Use integration tests instead.")]
-        public async Task GetBuildingsAroundPointAsync_InvalidLongitude_ThrowsInvalidOperationException()
+        [Fact]
+        public async Task GetBuildingsAroundPointAsync_SouthPole_ThrowsInvalidOperationException()
         {
             // Arrange
-            var latitude = 55.751244;
-            var longitude = 181.0; // Invalid longitude
-            var trackId = Guid.NewGuid();
+            var request = new BuildingsAroundPointRequestDto
+            {
+                Position = new PositionDto { X = -90.0, Z = 37.618423 }, // South pole
+                Distance = 100.0
+            };
 
             // Act & Assert
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                _buildingService.GetBuildingsAroundPointAsync(latitude, longitude, trackId));
+                _buildingService.GetBuildingsAroundPointAsync(request));
         }
 
-        [Fact(Skip = "Disabled - Mocking EF async operations is problematic. Use integration tests instead.")]
-        public async Task GetBuildingsAroundPointAsync_PolarRegion_ThrowsInvalidOperationException()
+        [Fact]
+        public async Task GetBuildingsAroundPointAsync_ExtremeLongitude_ThrowsInvalidOperationException()
         {
             // Arrange
-            var latitude = 85.0; // Near pole
-            var longitude = 37.618423;
-            var trackId = Guid.NewGuid();
+            var request = new BuildingsAroundPointRequestDto
+            {
+                Position = new PositionDto { X = 55.751244, Z = 181.0 }, // Invalid longitude
+                Distance = 100.0
+            };
 
             // Act & Assert
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                _buildingService.GetBuildingsAroundPointAsync(latitude, longitude, trackId));
+                _buildingService.GetBuildingsAroundPointAsync(request));
         }
 
-        [Fact(Skip = "Disabled - Mocking EF async operations is problematic. Use integration tests instead.")]
-        public async Task GetBuildingsAroundPointAsync_InvalidTrackId_ThrowsNotFoundException()
+        [Fact]
+        public async Task GetBuildingsAroundPointAsync_ValidCoordinates_ReturnsMixedBuildingTypes()
         {
             // Arrange
-            var latitude = 55.751244;
-            var longitude = 37.618423;
-            var trackId = Guid.NewGuid();
+            var request = new BuildingsAroundPointRequestDto
+            {
+                Position = new PositionDto { X = 55.751244, Z = 37.618423 },
+                Distance = 500.0
+            };
 
-            var mockTracksSet = new Mock<DbSet<Track>>();
-            var tracks = new List<Track>().AsQueryable(); // Empty tracks list
-            mockTracksSet.As<IQueryable<Track>>().Setup(m => m.Provider).Returns(tracks.Provider);
-            mockTracksSet.As<IQueryable<Track>>().Setup(m => m.Expression).Returns(tracks.Expression);
-            mockTracksSet.As<IQueryable<Track>>().Setup(m => m.ElementType).Returns(tracks.ElementType);
-            mockTracksSet.As<IQueryable<Track>>().Setup(m => m.GetEnumerator()).Returns(tracks.GetEnumerator());
+            // Act
+            var result = await _buildingService.GetBuildingsAroundPointAsync(request);
 
-            _mockContext.Setup(c => c.Tracks).Returns(mockTracksSet.Object);
+            // Assert
+            Assert.NotNull(result);
+
+            // Verify structure of standard buildings
+            var standardBuildings = result.OfType<object>().Where(b =>
+                b.GetType().GetProperty("nd") != null);
+
+            foreach (var building in standardBuildings)
+            {
+                var id = building.GetType().GetProperty("id")?.GetValue(building);
+                var nd = building.GetType().GetProperty("nd")?.GetValue(building) as IEnumerable<object>;
+
+                Assert.NotNull(id);
+                Assert.NotNull(nd);
+                Assert.NotEmpty(nd);
+
+                foreach (var node in nd)
+                {
+                    var lat = node.GetType().GetProperty("lat")?.GetValue(node);
+                    var lng = node.GetType().GetProperty("lng")?.GetValue(node);
+
+                    Assert.NotNull(lat);
+                    Assert.NotNull(lng);
+                }
+            }
+
+            // Verify structure of model buildings
+            var modelBuildings = result.OfType<object>().Where(b =>
+                b.GetType().GetProperty("model") != null);
+
+            foreach (var building in modelBuildings)
+            {
+                var id = building.GetType().GetProperty("id")?.GetValue(building);
+                var model = building.GetType().GetProperty("model")?.GetValue(building);
+                var lat = building.GetType().GetProperty("lat")?.GetValue(building);
+                var lng = building.GetType().GetProperty("lng")?.GetValue(building);
+                var rot = building.GetType().GetProperty("rot")?.GetValue(building) as IEnumerable<double>;
+
+                Assert.NotNull(id);
+                Assert.NotNull(model);
+                Assert.NotNull(lat);
+                Assert.NotNull(lng);
+                Assert.NotNull(rot);
+                Assert.Equal(3, rot.Count());
+            }
+        }
+
+        [Fact]
+        public async Task GetBuildingByAddressAsync_ValidAddress_ReturnsBuildingInfo()
+        {
+            // Arrange
+            var request = new BuildingByAddressRequestDto
+            {
+                Address = "Test Address 123"
+            };
+
+            // Act
+            var result = await _buildingService.GetBuildingByAddressAsync(request);
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.Equal(request.Address, result.Address);
+            Assert.NotNull(result.Nodes);
+            Assert.NotEmpty(result.Nodes);
+            Assert.True(result.Height > 0);
+
+            foreach (var node in result.Nodes)
+            {
+                Assert.True(node.X != 0 || node.Z != 0);
+            }
+        }
+
+        [Fact]
+        public async Task GetBuildingByAddressAsync_NotFoundAddress_ThrowsInvalidOperationException()
+        {
+            // Arrange
+            var request = new BuildingByAddressRequestDto
+            {
+                Address = "notfound_address_xyz"
+            };
 
             // Act & Assert
-            await Assert.ThrowsAsync<NotFoundException>(() =>
-                _buildingService.GetBuildingsAroundPointAsync(latitude, longitude, trackId));
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                _buildingService.GetBuildingByAddressAsync(request));
         }
 
-        [Fact(Skip = "Disabled - Mocking EF async operations is problematic. Use integration tests instead.")]
-        public async Task GetBuildingsAroundPointAsync_WithCustomModels_ReturnsCorrectData()
+        [Fact]
+        public async Task GetBuildingByAddressAsync_EmptyAddress_ThrowsInvalidOperationException()
         {
             // Arrange
-            var latitude = 55.751244;
-            var longitude = 37.618423;
-            var trackId = Guid.NewGuid();
-
-            var modelId = Guid.NewGuid();
-            var buildingWithModel = new Building
+            var request = new BuildingByAddressRequestDto
             {
-                Id = Guid.NewGuid(),
-                Latitude = 55.755826,
-                Longitude = 37.617300,
-                ModelId = modelId,
-                CustomModel = new Model
-                {
-                    Id = modelId,
-                    MinioObjectName = "model.glb",
-                    Position = new List<double> { 0, 0, 0 },
-                    Rotation = new List<double> { 45, 90, 0 },
-                    Scale = 1.0
-                }
+                Address = ""
             };
 
-            var buildings = new List<Building> { buildingWithModel };
-
-            var mockBuildingsSet = new Mock<DbSet<Building>>();
-            mockBuildingsSet.As<IQueryable<Building>>().Setup(m => m.Provider).Returns(buildings.AsQueryable().Provider);
-            mockBuildingsSet.As<IQueryable<Building>>().Setup(m => m.Expression).Returns(buildings.AsQueryable().Expression);
-            mockBuildingsSet.As<IQueryable<Building>>().Setup(m => m.ElementType).Returns(buildings.AsQueryable().ElementType);
-            mockBuildingsSet.As<IQueryable<Building>>().Setup(m => m.GetEnumerator()).Returns(buildings.AsQueryable().GetEnumerator());
-
-            var mockTracksSet = new Mock<DbSet<Track>>();
-            var tracks = new List<Track> { new Track { Id = trackId } }.AsQueryable();
-            mockTracksSet.As<IQueryable<Track>>().Setup(m => m.Provider).Returns(tracks.Provider);
-            mockTracksSet.As<IQueryable<Track>>().Setup(m => m.Expression).Returns(tracks.Expression);
-            mockTracksSet.As<IQueryable<Track>>().Setup(m => m.ElementType).Returns(tracks.ElementType);
-            mockTracksSet.As<IQueryable<Track>>().Setup(m => m.GetEnumerator()).Returns(tracks.GetEnumerator());
-
-            _mockContext.Setup(c => c.Buildings).Returns(mockBuildingsSet.Object);
-            _mockContext.Setup(c => c.Tracks).Returns(mockTracksSet.Object);
-
-            var buildingResponseDtos = new List<BuildingResponseDto>
-            {
-                new BuildingResponseDto
-                {
-                    Id = buildingWithModel.Id.ToString(),
-                    Model = buildingWithModel.CustomModel.Id.ToString(),
-                    Lat = buildingWithModel.Latitude,
-                    Lng = buildingWithModel.Longitude,
-                    Rot = buildingWithModel.CustomModel.Rotation
-                }
-            };
-
-            _mockMapper.Setup(m => m.Map<IEnumerable<BuildingResponseDto>>(It.IsAny<IEnumerable<Building>>()))
-                      .Returns(buildingResponseDtos);
-
-            // Act
-            var result = await _buildingService.GetBuildingsAroundPointAsync(latitude, longitude, trackId);
-
-            // Assert
-            var building = result.First();
-            Assert.Equal(buildingWithModel.Id.ToString(), building.Id);
-            Assert.Equal(modelId.ToString(), building.Model);
-            Assert.Equal(55.755826, building.Lat);
-            Assert.Equal(37.617300, building.Lng);
-            Assert.Equal(new double[] { 45, 90, 0 }, building.Rot);
-            Assert.Null(building.Nd);
+            // Act & Assert
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                _buildingService.GetBuildingByAddressAsync(request));
         }
 
-        [Fact(Skip = "Disabled - Mocking EF async operations is problematic. Use integration tests instead.")]
-        public async Task GetBuildingsAroundPointAsync_WithStandardBuildings_ReturnsCorrectData()
+        [Fact]
+        public async Task GetBuildingByAddressAsync_AddressWithModel_ReturnsModelUrl()
         {
             // Arrange
-            var latitude = 55.751244;
-            var longitude = 37.618423;
-            var trackId = Guid.NewGuid();
-
-            var standardBuilding = new Building
+            var request = new BuildingByAddressRequestDto
             {
-                Id = Guid.NewGuid(),
-                Latitude = 55.751244,
-                Longitude = 37.618423,
-                ModelId = null,
-                CustomModel = null
+                Address = "model_building_address"
             };
-
-            var buildings = new List<Building> { standardBuilding };
-
-            var mockBuildingsSet = new Mock<DbSet<Building>>();
-            mockBuildingsSet.As<IQueryable<Building>>().Setup(m => m.Provider).Returns(buildings.AsQueryable().Provider);
-            mockBuildingsSet.As<IQueryable<Building>>().Setup(m => m.Expression).Returns(buildings.AsQueryable().Expression);
-            mockBuildingsSet.As<IQueryable<Building>>().Setup(m => m.ElementType).Returns(buildings.AsQueryable().ElementType);
-            mockBuildingsSet.As<IQueryable<Building>>().Setup(m => m.GetEnumerator()).Returns(buildings.AsQueryable().GetEnumerator());
-
-            var mockTracksSet = new Mock<DbSet<Track>>();
-            var tracks = new List<Track> { new Track { Id = trackId } }.AsQueryable();
-            mockTracksSet.As<IQueryable<Track>>().Setup(m => m.Provider).Returns(tracks.Provider);
-            mockTracksSet.As<IQueryable<Track>>().Setup(m => m.Expression).Returns(tracks.Expression);
-            mockTracksSet.As<IQueryable<Track>>().Setup(m => m.ElementType).Returns(tracks.ElementType);
-            mockTracksSet.As<IQueryable<Track>>().Setup(m => m.GetEnumerator()).Returns(tracks.GetEnumerator());
-
-            _mockContext.Setup(c => c.Buildings).Returns(mockBuildingsSet.Object);
-            _mockContext.Setup(c => c.Tracks).Returns(mockTracksSet.Object);
-
-            var buildingResponseDtos = new List<BuildingResponseDto>
-            {
-                new BuildingResponseDto
-                {
-                    Id = standardBuilding.Id.ToString(),
-                    Nd = new List<BuildingNodeDto>
-                    {
-                        new BuildingNodeDto(standardBuilding.Latitude + 0.01, standardBuilding.Longitude + 0.01),
-                        new BuildingNodeDto(standardBuilding.Latitude - 0.01, standardBuilding.Longitude - 0.01)
-                    }
-                }
-            };
-
-            _mockMapper.Setup(m => m.Map<IEnumerable<BuildingResponseDto>>(It.IsAny<IEnumerable<Building>>()))
-                      .Returns(buildingResponseDtos);
 
             // Act
-            var result = await _buildingService.GetBuildingsAroundPointAsync(latitude, longitude, trackId);
+            var result = await _buildingService.GetBuildingByAddressAsync(request);
 
             // Assert
-            var building = result.First();
-            Assert.Equal(standardBuilding.Id.ToString(), building.Id);
-            Assert.NotNull(building.Nd);
-            Assert.Equal(2, building.Nd.Count());
-            Assert.Null(building.Model);
-            Assert.Null(building.Lat);
-            Assert.Null(building.Lng);
-            Assert.Null(building.Rot);
+            Assert.NotNull(result);
+            Assert.NotNull(result.ModelUrl);
+            Assert.Contains("model", result.ModelUrl);
         }
 
-        [Fact(Skip = "Disabled - Mocking EF async operations is problematic. Use integration tests instead.")]
-        public async Task GetBuildingsAroundPointAsync_NoBuildingsInArea_ReturnsEmptyList()
+        [Fact]
+        public async Task GetBuildingByAddressAsync_AddressWithoutModel_ReturnsNullModelUrl()
         {
             // Arrange
-            var latitude = 55.751244;
-            var longitude = 37.618423;
-            var trackId = Guid.NewGuid();
-
-            // Buildings far from the search point
-            var buildings = new List<Building>
+            var request = new BuildingByAddressRequestDto
             {
-                new Building { Id = Guid.NewGuid(), Latitude = 60.0, Longitude = 30.0 }, // Far away
-                new Building { Id = Guid.NewGuid(), Latitude = 50.0, Longitude = 40.0 }  // Far away
+                Address = "standard_building_address"
             };
 
-            var mockBuildingsSet = new Mock<DbSet<Building>>();
-            mockBuildingsSet.As<IQueryable<Building>>().Setup(m => m.Provider).Returns(buildings.AsQueryable().Provider);
-            mockBuildingsSet.As<IQueryable<Building>>().Setup(m => m.Expression).Returns(buildings.AsQueryable().Expression);
-            mockBuildingsSet.As<IQueryable<Building>>().Setup(m => m.ElementType).Returns(buildings.AsQueryable().ElementType);
-            mockBuildingsSet.As<IQueryable<Building>>().Setup(m => m.GetEnumerator()).Returns(buildings.AsQueryable().GetEnumerator());
-
-            var mockTracksSet = new Mock<DbSet<Track>>();
-            var tracks = new List<Track> { new Track { Id = trackId } }.AsQueryable();
-            mockTracksSet.As<IQueryable<Track>>().Setup(m => m.Provider).Returns(tracks.Provider);
-            mockTracksSet.As<IQueryable<Track>>().Setup(m => m.Expression).Returns(tracks.Expression);
-            mockTracksSet.As<IQueryable<Track>>().Setup(m => m.ElementType).Returns(tracks.ElementType);
-            mockTracksSet.As<IQueryable<Track>>().Setup(m => m.GetEnumerator()).Returns(tracks.GetEnumerator());
-
-            _mockContext.Setup(c => c.Buildings).Returns(mockBuildingsSet.Object);
-            _mockContext.Setup(c => c.Tracks).Returns(mockTracksSet.Object);
-
-            var buildingResponseDtos = new List<BuildingResponseDto>();
-
-            _mockMapper.Setup(m => m.Map<IEnumerable<BuildingResponseDto>>(It.IsAny<IEnumerable<Building>>()))
-                      .Returns(buildingResponseDtos);
-
             // Act
-            var result = await _buildingService.GetBuildingsAroundPointAsync(latitude, longitude, trackId);
+            var result = await _buildingService.GetBuildingByAddressAsync(request);
 
             // Assert
-            Assert.Empty(result);
-            _mockContext.Verify(x => x.Buildings, Times.Once);
-            _mockContext.Verify(x => x.Tracks, Times.Once);
+            Assert.NotNull(result);
+            Assert.Null(result.ModelUrl);
+        }
+
+        [Fact]
+        public async Task GetBuildingsAroundPointAsync_DifferentDistances_ReturnsAppropriateResults()
+        {
+            // Test with small distance
+            var smallRequest = new BuildingsAroundPointRequestDto
+            {
+                Position = new PositionDto { X = 55.751244, Z = 37.618423 },
+                Distance = 10.0
+            };
+
+            var smallResult = await _buildingService.GetBuildingsAroundPointAsync(smallRequest);
+            Assert.NotNull(smallResult);
+
+            // Test with large distance
+            var largeRequest = new BuildingsAroundPointRequestDto
+            {
+                Position = new PositionDto { X = 55.751244, Z = 37.618423 },
+                Distance = 1000.0
+            };
+
+            var largeResult = await _buildingService.GetBuildingsAroundPointAsync(largeRequest);
+            Assert.NotNull(largeResult);
+        }
+
+        [Fact]
+        public async Task GetBuildingsAroundPointAsync_ZeroDistance_ReturnsBuildings()
+        {
+            // Arrange
+            var request = new BuildingsAroundPointRequestDto
+            {
+                Position = new PositionDto { X = 55.751244, Z = 37.618423 },
+                Distance = 0.0
+            };
+
+            // Act
+            var result = await _buildingService.GetBuildingsAroundPointAsync(request);
+
+            // Assert
+            Assert.NotNull(result);
         }
     }
 }

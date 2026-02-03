@@ -48,13 +48,11 @@ namespace Excursion_GPT.Tests.Infrastructure
         public void HashPassword_NullPassword_ThrowsArgumentNullException()
         {
             // Arrange
-            string password = null;
+            string? password = null;
 
             // Act & Assert
-            Assert.Throws<ArgumentNullException>(() => _passwordHasher.HashPassword(password));
+            Assert.Throws<ArgumentNullException>(() => _passwordHasher.HashPassword(password!));
         }
-
-
 
         [Fact(Skip = "BCrypt throws SaltParseException in this test scenario")]
         public void VerifyPassword_IncorrectPassword_ReturnsFalse()
@@ -65,7 +63,7 @@ namespace Excursion_GPT.Tests.Infrastructure
             var hashedPassword = _passwordHasher.HashPassword(correctPassword);
 
             // Act
-            var result = _passwordHasher.VerifyPassword(incorrectPassword, hashedPassword);
+            var result = _passwordHasher.VerifyPassword(hashedPassword, incorrectPassword);
 
             // Assert
             Assert.False(result);
@@ -80,27 +78,22 @@ namespace Excursion_GPT.Tests.Infrastructure
             var hashedPassword = _passwordHasher.HashPassword(correctPassword);
 
             // Act
-            var result = _passwordHasher.VerifyPassword(emptyPassword, hashedPassword);
+            var result = _passwordHasher.VerifyPassword(hashedPassword, emptyPassword);
 
             // Assert
             Assert.False(result);
         }
 
         [Fact(Skip = "BCrypt throws ArgumentNullException for null passwords")]
-        public void VerifyPassword_NullPassword_ReturnsFalse()
+        public void VerifyPassword_NullPassword_ThrowsArgumentNullException()
         {
             // Arrange
-            string password = null;
+            string? password = null;
             var hashedPassword = _passwordHasher.HashPassword("somepassword");
 
-            // Act
-            var result = _passwordHasher.VerifyPassword(hashedPassword, password);
-
-            // Assert
-            Assert.False(result);
+            // Act & Assert
+            Assert.Throws<ArgumentNullException>(() => _passwordHasher.VerifyPassword(hashedPassword, password!));
         }
-
-
 
         [Fact(Skip = "BCrypt throws SaltParseException for empty hashed passwords")]
         public void VerifyPassword_EmptyHashedPassword_ReturnsFalse()

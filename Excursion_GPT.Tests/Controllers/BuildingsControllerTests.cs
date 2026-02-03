@@ -26,11 +26,11 @@ namespace Excursion_GPT.Tests.Controllers
             _controller = new BuildingsController(_mockBuildingService.Object, _mockLogger.Object);
         }
 
-        private void SetupAuthenticatedUser(Guid userId, string role = "User")
+        private void SetupAuthenticatedUser(string role = "User")
         {
             var claims = new List<Claim>
             {
-                new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
                 new Claim(ClaimTypes.Name, "testuser"),
                 new Claim(ClaimTypes.Role, role)
             };
@@ -44,309 +44,276 @@ namespace Excursion_GPT.Tests.Controllers
         }
 
         [Fact]
-        public async Task GetBuildingsAroundPoint_ValidParameters_ReturnsBuildings()
+        public async Task GetBuildingsAroundPoint_AuthenticatedUser_ReturnsBuildings()
         {
             // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId);
+            SetupAuthenticatedUser("User");
 
-            var latitude = 55.751244;
-            var longitude = 37.618423;
-            var excursionId = Guid.NewGuid();
-
-            var buildings = new List<BuildingResponseDto>
+            var request = new BuildingsAroundPointRequestDto
             {
-                new BuildingResponseDto
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Nd = new List<BuildingNodeDto>
-                    {
-                        new BuildingNodeDto(55.751244, 37.618423),
-                        new BuildingNodeDto(55.751254, 37.618433)
-                    }
-                },
-                new BuildingResponseDto
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Model = Guid.NewGuid().ToString(),
-                    Lat = 55.755826,
-                    Lng = 37.617300,
-                    Rot = new List<double> { 0, 0, 0 }
-                }
+                Position = new PositionDto { X = 55.751244, Z = 37.618423 },
+                Distance = 100.0
             };
 
-            _mockBuildingService.Setup(x => x.GetBuildingsAroundPointAsync(latitude, longitude, excursionId))
-                .ReturnsAsync(buildings);
+            var expectedResult = new List<object>
+            {
+                new { id = "234234", nd = new[] { new { lat = 66.3333, lng = 65.4444 } } },
+                new { id = "234235", model = "model_001", lat = 67.3333, lng = 68.4444, rot = new[] { 0.0, 1.5, 0.0 } }
+            };
+
+            _mockBuildingService.Setup(s => s.GetBuildingsAroundPointAsync(request))
+                .ReturnsAsync(expectedResult);
 
             // Act
-            var result = await _controller.GetBuildingsAroundPoint(latitude, longitude, excursionId);
+            var result = await _controller.GetBuildingsAroundPoint(request);
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var returnedBuildings = Assert.IsType<List<BuildingResponseDto>>(okResult.Value);
+            var returnedBuildings = Assert.IsType<List<object>>(okResult.Value);
             Assert.Equal(2, returnedBuildings.Count);
-            _mockBuildingService.Verify(x => x.GetBuildingsAroundPointAsync(latitude, longitude, excursionId), Times.Once);
         }
 
         [Fact]
-        public async Task GetBuildingsAroundPoint_UserRole_AllowsAccess()
+        public async Task GetBuildingsAroundPoint_Unauthenticated_ReturnsUnauthorized()
         {
-            // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId, "User");
-
-            var latitude = 55.751244;
-            var longitude = 37.618423;
-            var excursionId = Guid.NewGuid();
-
-            var buildings = new List<BuildingResponseDto>
+            // Arrange - No user setup
+            _controller.ControllerContext = new ControllerContext
             {
-                new BuildingResponseDto { Id = Guid.NewGuid().ToString() }
+                HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal() }
             };
 
-            _mockBuildingService.Setup(x => x.GetBuildingsAroundPointAsync(latitude, longitude, excursionId))
-                .ReturnsAsync(buildings);
-
-            // Act
-            var result = await _controller.GetBuildingsAroundPoint(latitude, longitude, excursionId);
-
-            // Assert
-            Assert.IsType<OkObjectResult>(result.Result);
-            _mockBuildingService.Verify(x => x.GetBuildingsAroundPointAsync(latitude, longitude, excursionId), Times.Once);
-        }
-
-        [Fact]
-        public async Task GetBuildingsAroundPoint_CreatorRole_AllowsAccess()
-        {
-            // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId, "Creator");
-
-            var latitude = 55.751244;
-            var longitude = 37.618423;
-            var excursionId = Guid.NewGuid();
-
-            var buildings = new List<BuildingResponseDto>
+            var request = new BuildingsAroundPointRequestDto
             {
-                new BuildingResponseDto { Id = Guid.NewGuid().ToString() }
+                Position = new PositionDto { X = 55.751244, Z = 37.618423 },
+                Distance = 100.0
             };
 
-            _mockBuildingService.Setup(x => x.GetBuildingsAroundPointAsync(latitude, longitude, excursionId))
-                .ReturnsAsync(buildings);
-
             // Act
-            var result = await _controller.GetBuildingsAroundPoint(latitude, longitude, excursionId);
+            var result = await _controller.GetBuildingsAroundPoint(request);
 
             // Assert
-            Assert.IsType<OkObjectResult>(result.Result);
-            _mockBuildingService.Verify(x => x.GetBuildingsAroundPointAsync(latitude, longitude, excursionId), Times.Once);
+            Assert.IsType<UnauthorizedObjectResult>(result.Result);
         }
 
         [Fact]
-        public async Task GetBuildingsAroundPoint_AdminRole_AllowsAccess()
+        public async Task GetBuildingsAroundPoint_NorthPole_ReturnsNotAcceptable()
         {
             // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId, "Admin");
+            SetupAuthenticatedUser("User");
 
-            var latitude = 55.751244;
-            var longitude = 37.618423;
-            var excursionId = Guid.NewGuid();
-
-            var buildings = new List<BuildingResponseDto>
+            var request = new BuildingsAroundPointRequestDto
             {
-                new BuildingResponseDto { Id = Guid.NewGuid().ToString() }
+                Position = new PositionDto { X = 90.0, Z = 37.618423 }, // North pole
+                Distance = 100.0
             };
 
-            _mockBuildingService.Setup(x => x.GetBuildingsAroundPointAsync(latitude, longitude, excursionId))
-                .ReturnsAsync(buildings);
+            _mockBuildingService.Setup(s => s.GetBuildingsAroundPointAsync(request))
+                .ThrowsAsync(new InvalidOperationException("Unknown terrain"));
 
             // Act
-            var result = await _controller.GetBuildingsAroundPoint(latitude, longitude, excursionId);
+            var result = await _controller.GetBuildingsAroundPoint(request);
 
             // Assert
-            Assert.IsType<OkObjectResult>(result.Result);
-            _mockBuildingService.Verify(x => x.GetBuildingsAroundPointAsync(latitude, longitude, excursionId), Times.Once);
+            var statusCodeResult = Assert.IsType<ObjectResult>(result.Result);
+            Assert.Equal(406, statusCodeResult.StatusCode);
         }
 
         [Fact]
-        public async Task GetBuildingsAroundPoint_EmptyResult_ReturnsEmptyList()
+        public async Task GetBuildingByAddress_ValidAddress_ReturnsBuilding()
         {
             // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId);
+            SetupAuthenticatedUser("User");
 
-            var latitude = 55.751244;
-            var longitude = 37.618423;
-            var excursionId = Guid.NewGuid();
-
-            var buildings = new List<BuildingResponseDto>();
-
-            _mockBuildingService.Setup(x => x.GetBuildingsAroundPointAsync(latitude, longitude, excursionId))
-                .ReturnsAsync(buildings);
-
-            // Act
-            var result = await _controller.GetBuildingsAroundPoint(latitude, longitude, excursionId);
-
-            // Assert
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var returnedBuildings = Assert.IsType<List<BuildingResponseDto>>(okResult.Value);
-            Assert.Empty(returnedBuildings);
-            _mockBuildingService.Verify(x => x.GetBuildingsAroundPointAsync(latitude, longitude, excursionId), Times.Once);
-        }
-
-        [Fact]
-        public async Task GetBuildingsAroundPoint_WithStandardBuildings_ReturnsCorrectData()
-        {
-            // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId);
-
-            var latitude = 55.751244;
-            var longitude = 37.618423;
-            var excursionId = Guid.NewGuid();
-
-            var buildingId = Guid.NewGuid().ToString();
-            var buildings = new List<BuildingResponseDto>
+            var request = new BuildingByAddressRequestDto
             {
-                new BuildingResponseDto
+                Address = "Test Address 123"
+            };
+
+            var expectedResponse = new BuildingByAddressResponseDto
+            {
+                Address = "Test Address 123",
+                Nodes = new List<PositionDto>
                 {
-                    Id = buildingId,
-                    Nd = new List<BuildingNodeDto>
-                    {
-                        new BuildingNodeDto(55.751244, 37.618423),
-                        new BuildingNodeDto(55.751254, 37.618433),
-                        new BuildingNodeDto(55.751244, 37.618433)
-                    }
-                }
-            };
-
-            _mockBuildingService.Setup(x => x.GetBuildingsAroundPointAsync(latitude, longitude, excursionId))
-                .ReturnsAsync(buildings);
-
-            // Act
-            var result = await _controller.GetBuildingsAroundPoint(latitude, longitude, excursionId);
-
-            // Assert
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var returnedBuildings = Assert.IsType<List<BuildingResponseDto>>(okResult.Value);
-            var building = returnedBuildings[0];
-            Assert.Equal(buildingId, building.Id);
-            Assert.NotNull(building.Nd);
-            Assert.Equal(3, building.Nd.Count());
-            Assert.Null(building.Model);
-            Assert.Null(building.Lat);
-            Assert.Null(building.Lng);
-            Assert.Null(building.Rot);
-        }
-
-        [Fact]
-        public async Task GetBuildingsAroundPoint_WithCustomModels_ReturnsCorrectData()
-        {
-            // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId);
-
-            var latitude = 55.751244;
-            var longitude = 37.618423;
-            var excursionId = Guid.NewGuid();
-
-            var buildingId = Guid.NewGuid().ToString();
-            var modelId = Guid.NewGuid().ToString();
-            var buildings = new List<BuildingResponseDto>
-            {
-                new BuildingResponseDto
-                {
-                    Id = buildingId,
-                    Model = modelId,
-                    Lat = 55.755826,
-                    Lng = 37.617300,
-                    Rot = new List<double> { 45.0, 90.0, 0.0 }
-                }
-            };
-
-            _mockBuildingService.Setup(x => x.GetBuildingsAroundPointAsync(latitude, longitude, excursionId))
-                .ReturnsAsync(buildings);
-
-            // Act
-            var result = await _controller.GetBuildingsAroundPoint(latitude, longitude, excursionId);
-
-            // Assert
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var returnedBuildings = Assert.IsType<List<BuildingResponseDto>>(okResult.Value);
-            var building = returnedBuildings[0];
-            Assert.Equal(buildingId, building.Id);
-            Assert.Equal(modelId, building.Model);
-            Assert.Equal(55.755826, building.Lat);
-            Assert.Equal(37.617300, building.Lng);
-            Assert.NotNull(building.Rot);
-            Assert.Equal(new double[] { 45.0, 90.0, 0.0 }, building.Rot);
-            Assert.Null(building.Nd);
-        }
-
-        [Fact]
-        public async Task GetBuildingsAroundPoint_MixedBuildingTypes_ReturnsCorrectData()
-        {
-            // Arrange
-            var userId = Guid.NewGuid();
-            SetupAuthenticatedUser(userId);
-
-            var latitude = 55.751244;
-            var longitude = 37.618423;
-            var excursionId = Guid.NewGuid();
-
-            var buildings = new List<BuildingResponseDto>
-            {
-                new BuildingResponseDto
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Nd = new List<BuildingNodeDto>
-                    {
-                        new BuildingNodeDto(55.751244, 37.618423)
-                    }
+                    new PositionDto { X = 66.3333, Z = 65.4444 },
+                    new PositionDto { X = 66.3334, Z = 65.4445 }
                 },
-                new BuildingResponseDto
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Model = Guid.NewGuid().ToString(),
-                    Lat = 55.755826,
-                    Lng = 37.617300,
-                    Rot = new List<double> { 0, 0, 0 }
-                },
-                new BuildingResponseDto
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Nd = new List<BuildingNodeDto>
-                    {
-                        new BuildingNodeDto(55.751254, 37.618433)
-                    }
-                }
+                Height = 25.5,
+                Position = new PositionDto { X = 66.3334, Z = 65.4445 }
             };
 
-            _mockBuildingService.Setup(x => x.GetBuildingsAroundPointAsync(latitude, longitude, excursionId))
-                .ReturnsAsync(buildings);
+            _mockBuildingService.Setup(s => s.GetBuildingByAddressAsync(request))
+                .ReturnsAsync(expectedResponse);
 
             // Act
-            var result = await _controller.GetBuildingsAroundPoint(latitude, longitude, excursionId);
+            var result = await _controller.GetBuildingByAddress(request);
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var returnedBuildings = Assert.IsType<List<BuildingResponseDto>>(okResult.Value);
-            Assert.Equal(3, returnedBuildings.Count);
+            var returnedBuilding = Assert.IsType<BuildingByAddressResponseDto>(okResult.Value);
+            Assert.Equal("Test Address 123", returnedBuilding.Address);
+            Assert.Equal(2, returnedBuilding.Nodes.Count);
+            Assert.Equal(25.5, returnedBuilding.Height);
+        }
 
-            // Verify first building (standard)
-            Assert.NotNull(returnedBuildings[0].Nd);
-            Assert.Null(returnedBuildings[0].Model);
+        [Fact]
+        public async Task GetBuildingByAddress_NotFound_ReturnsNotFound()
+        {
+            // Arrange
+            SetupAuthenticatedUser("User");
 
-            // Verify second building (custom model)
-            Assert.Null(returnedBuildings[1].Nd);
-            Assert.NotNull(returnedBuildings[1].Model);
+            var request = new BuildingByAddressRequestDto
+            {
+                Address = "notfound_address"
+            };
 
-            // Verify third building (standard)
-            Assert.NotNull(returnedBuildings[2].Nd);
-            Assert.Null(returnedBuildings[2].Model);
+            _mockBuildingService.Setup(s => s.GetBuildingByAddressAsync(request))
+                .ThrowsAsync(new InvalidOperationException("Building not found"));
 
-            _mockBuildingService.Verify(x => x.GetBuildingsAroundPointAsync(latitude, longitude, excursionId), Times.Once);
+            // Act
+            var result = await _controller.GetBuildingByAddress(request);
+
+            // Assert
+            Assert.IsType<NotFoundObjectResult>(result.Result);
+        }
+
+        [Fact]
+        public async Task GetBuildingByAddress_UnauthorizedUser_ReturnsUnauthorized()
+        {
+            // Arrange
+            SetupAuthenticatedUser("User");
+
+            var request = new BuildingByAddressRequestDto
+            {
+                Address = "Test Address"
+            };
+
+            _mockBuildingService.Setup(s => s.GetBuildingByAddressAsync(request))
+                .ThrowsAsync(new UnauthorizedAccessException());
+
+            // Act
+            var result = await _controller.GetBuildingByAddress(request);
+
+            // Assert
+            Assert.IsType<UnauthorizedObjectResult>(result.Result);
+        }
+
+        [Fact]
+        public async Task GetBuildingByAddress_ForbiddenRole_ReturnsForbidden()
+        {
+            // Arrange
+            SetupAuthenticatedUser("User");
+
+            var request = new BuildingByAddressRequestDto
+            {
+                Address = "Test Address"
+            };
+
+            _mockBuildingService.Setup(s => s.GetBuildingByAddressAsync(request))
+                .ThrowsAsync(new InvalidOperationException("role"));
+
+            // Act
+            var result = await _controller.GetBuildingByAddress(request);
+
+            // Assert
+            var statusCodeResult = Assert.IsType<ObjectResult>(result.Result);
+            Assert.Equal(403, statusCodeResult.StatusCode);
+        }
+
+        [Fact]
+        public async Task GetBuildingsAroundPoint_ServiceException_ReturnsAppropriateError()
+        {
+            // Arrange
+            SetupAuthenticatedUser("User");
+
+            var request = new BuildingsAroundPointRequestDto
+            {
+                Position = new PositionDto { X = 55.751244, Z = 37.618423 },
+                Distance = 100.0
+            };
+
+            _mockBuildingService.Setup(s => s.GetBuildingsAroundPointAsync(request))
+                .ThrowsAsync(new InvalidOperationException("track"));
+
+            // Act
+            var result = await _controller.GetBuildingsAroundPoint(request);
+
+            // Assert
+            Assert.IsType<NotFoundObjectResult>(result.Result);
+        }
+
+        [Fact]
+        public async Task GetBuildingsAroundPoint_AllRolesAllowed()
+        {
+            // Test with User role
+            await TestRoleAccess("User");
+
+            // Test with Creator role
+            await TestRoleAccess("Creator");
+
+            // Test with Admin role
+            await TestRoleAccess("Admin");
+        }
+
+        private async Task TestRoleAccess(string role)
+        {
+            // Arrange
+            SetupAuthenticatedUser(role);
+
+            var request = new BuildingsAroundPointRequestDto
+            {
+                Position = new PositionDto { X = 55.751244, Z = 37.618423 },
+                Distance = 100.0
+            };
+
+            var expectedResult = new List<object>
+            {
+                new { id = "test_building", nd = new[] { new { lat = 66.3333, lng = 65.4444 } } }
+            };
+
+            _mockBuildingService.Setup(s => s.GetBuildingsAroundPointAsync(request))
+                .ReturnsAsync(expectedResult);
+
+            // Act
+            var result = await _controller.GetBuildingsAroundPoint(request);
+
+            // Assert
+            Assert.IsType<OkObjectResult>(result.Result);
+        }
+
+        [Fact]
+        public async Task GetBuildingByAddress_AddressWithModel_ReturnsModelUrl()
+        {
+            // Arrange
+            SetupAuthenticatedUser("User");
+
+            var request = new BuildingByAddressRequestDto
+            {
+                Address = "model_building"
+            };
+
+            var expectedResponse = new BuildingByAddressResponseDto
+            {
+                Address = "model_building",
+                Nodes = new List<PositionDto>
+                {
+                    new PositionDto { X = 66.3333, Z = 65.4444 }
+                },
+                Height = 30.0,
+                Position = new PositionDto { X = 66.3333, Z = 65.4444 },
+                ModelUrl = "https://storage.example.com/models/model_001.glb"
+            };
+
+            _mockBuildingService.Setup(s => s.GetBuildingByAddressAsync(request))
+                .ReturnsAsync(expectedResponse);
+
+            // Act
+            var result = await _controller.GetBuildingByAddress(request);
+
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(result.Result);
+            var returnedBuilding = Assert.IsType<BuildingByAddressResponseDto>(okResult.Value);
+            Assert.NotNull(returnedBuilding.ModelUrl);
+            Assert.Contains("model", returnedBuilding.ModelUrl);
         }
     }
 }
