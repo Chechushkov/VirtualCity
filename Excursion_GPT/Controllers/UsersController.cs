@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Excursion_GPT.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("users")]
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
@@ -20,8 +20,27 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Get all users (Admin only)
+    /// Получить всех пользователей (только для администраторов)
     /// </summary>
+    /// <remarks>
+    /// **Ответ:**
+    /// ```json
+    /// [
+    ///   {
+    ///     "id": "guid",
+    ///     "login": "string",
+    ///     "email": "string",
+    ///     "role": "Admin|Creator|User",
+    ///     "createdAt": "datetime"
+    ///   },
+    ///   ...
+    /// ]
+    /// ```
+    ///
+    /// **Ошибки:**
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// - **403 Forbidden**: Если пользователь не является администратором
+    /// </remarks>
     [HttpGet]
     [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IEnumerable<UserDto>))]
@@ -35,8 +54,33 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Create a new user
+    /// Создать нового пользователя
     /// </summary>
+    /// <remarks>
+    /// **Тело запроса:**
+    /// ```json
+    /// {
+    ///   "login": "string",
+    ///   "email": "string",
+    ///   "password": "string",
+    ///   "role": "Admin|Creator|User"
+    /// }
+    /// ```
+    ///
+    /// **Ответ:**
+    /// ```json
+    /// {
+    ///   "id": "guid",
+    ///   "login": "string",
+    ///   "email": "string",
+    ///   "role": "Admin|Creator|User",
+    ///   "createdAt": "datetime"
+    /// }
+    /// ```
+    ///
+    /// **Ошибки:**
+    /// - **400 Bad Request**: Если данные невалидны или пользователь уже существует
+    /// </remarks>
     [HttpPost]
     [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(UserDto))]
@@ -49,8 +93,25 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Get user by ID
+    /// Получить пользователя по ID (только для администраторов)
     /// </summary>
+    /// <remarks>
+    /// **Ответ:**
+    /// ```json
+    /// {
+    ///   "id": "guid",
+    ///   "login": "string",
+    ///   "email": "string",
+    ///   "role": "Admin|Creator|User",
+    ///   "createdAt": "datetime"
+    /// }
+    /// ```
+    ///
+    /// **Ошибки:**
+    /// - **404 Not Found**: Если пользователь не найден
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// - **403 Forbidden**: Если пользователь не является администратором
+    /// </remarks>
     [HttpGet("{userId:guid}")]
     [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(UserDto))]
@@ -65,8 +126,24 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Get current user profile
+    /// Получить профиль текущего пользователя
     /// </summary>
+    /// <remarks>
+    /// **Ответ:**
+    /// ```json
+    /// {
+    ///   "id": "guid",
+    ///   "login": "string",
+    ///   "email": "string",
+    ///   "role": "Admin|Creator|User",
+    ///   "createdAt": "datetime"
+    /// }
+    /// ```
+    ///
+    /// **Ошибки:**
+    /// - **404 Not Found**: Если пользователь не найден
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// </remarks>
     [HttpGet("profile")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(UserDto))]
@@ -81,8 +158,36 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Update user data
+    /// Обновить данные пользователя (только для администраторов)
     /// </summary>
+    /// <remarks>
+    /// **Тело запроса:**
+    /// ```json
+    /// {
+    ///   "login": "string",
+    ///   "email": "string",
+    ///   "password": "string",
+    ///   "role": "Admin|Creator|User"
+    /// }
+    /// ```
+    ///
+    /// **Ответ:**
+    /// ```json
+    /// {
+    ///   "id": "guid",
+    ///   "login": "string",
+    ///   "email": "string",
+    ///   "role": "Admin|Creator|User",
+    ///   "createdAt": "datetime"
+    /// }
+    /// ```
+    ///
+    /// **Ошибки:**
+    /// - **400 Bad Request**: Если данные невалидны
+    /// - **404 Not Found**: Если пользователь не найден
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// - **403 Forbidden**: Если пользователь не является администратором
+    /// </remarks>
     [HttpPut("{userId:guid}")]
     [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(UserDto))]
@@ -98,8 +203,34 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Update current user profile
+    /// Обновить профиль текущего пользователя
     /// </summary>
+    /// <remarks>
+    /// **Тело запроса:**
+    /// ```json
+    /// {
+    ///   "login": "string",
+    ///   "email": "string",
+    ///   "password": "string"
+    /// }
+    /// ```
+    ///
+    /// **Ответ:**
+    /// ```json
+    /// {
+    ///   "id": "guid",
+    ///   "login": "string",
+    ///   "email": "string",
+    ///   "role": "Admin|Creator|User",
+    ///   "createdAt": "datetime"
+    /// }
+    /// ```
+    ///
+    /// **Ошибки:**
+    /// - **400 Bad Request**: Если данные невалидны
+    /// - **404 Not Found**: Если пользователь не найден
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// </remarks>
     [HttpPut("profile")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(UserDto))]
@@ -115,8 +246,14 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Delete user
+    /// Удалить пользователя (только для администраторов)
     /// </summary>
+    /// <remarks>
+    /// **Ошибки:**
+    /// - **404 Not Found**: Если пользователь не найден
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// - **403 Forbidden**: Если пользователь не является администратором
+    /// </remarks>
     [HttpDelete("{userId:guid}")]
     [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -131,8 +268,34 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// User authentication
+    /// Аутентификация пользователя
     /// </summary>
+    /// <remarks>
+    /// **Тело запроса:**
+    /// ```json
+    /// {
+    ///   "login": "string",
+    ///   "password": "string"
+    /// }
+    /// ```
+    ///
+    /// **Ответ:**
+    /// ```json
+    /// {
+    ///   "token": "jwt_token",
+    ///   "expiresIn": 3600,
+    ///   "user": {
+    ///     "id": "guid",
+    ///     "login": "string",
+    ///     "email": "string",
+    ///     "role": "Admin|Creator|User"
+    ///   }
+    /// }
+    /// ```
+    ///
+    /// **Ошибки:**
+    /// - **401 Unauthorized**: Если логин или пароль неверны
+    /// </remarks>
     [HttpPost("login")]
     [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(AuthResponseDto))]
@@ -145,11 +308,23 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// User logout (client-side operation)
+    /// Выход пользователя (операция на стороне клиента)
     /// </summary>
     /// <remarks>
-    /// For JWT-based authentication, logout is typically handled client-side by discarding the token.
-    /// This endpoint can be used for server-side cleanup if needed (e.g., token blacklisting).
+    /// Для JWT-аутентификации выход обычно обрабатывается на стороне клиента путем удаления токена.
+    /// Этот endpoint может использоваться для очистки на стороне сервера, если это необходимо (например, черный список токенов).
+    ///
+    /// **Ответ:**
+    /// ```json
+    /// {
+    ///   "success": true,
+    ///   "message": "Logout successful. Please discard your token client-side.",
+    ///   "userId": "guid"
+    /// }
+    /// ```
+    ///
+    /// **Ошибки:**
+    /// - **401 Unauthorized**: Если не прилогинились
     /// </remarks>
     [HttpPost("logout")]
     [Authorize]

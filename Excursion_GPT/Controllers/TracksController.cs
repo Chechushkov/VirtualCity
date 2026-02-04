@@ -22,8 +22,21 @@ public class TracksController : ControllerBase
     }
 
     /// <summary>
-    /// Get all tracks
+    /// Получить список экскурсий
     /// </summary>
+    /// <remarks>
+    /// **Ответ:**
+    /// ```json
+    /// [
+    ///   { "id": "track_id", "name": "track_name" },
+    ///   ...
+    /// ]
+    /// ```
+    ///
+    /// **Ошибки:**
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// - **403 Forbidden**: Если по роли не положено получать
+    /// </remarks>
     [HttpGet]
     [Authorize(Roles = "Admin,Creator,User")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<TrackListItemDto>))]
@@ -49,8 +62,23 @@ public class TracksController : ControllerBase
     }
 
     /// <summary>
-    /// Get track by ID with all points
+    /// Получить экскурсию со всеми точками, которые в ней
     /// </summary>
+    /// <remarks>
+    /// **Ответ:**
+    /// ```json
+    /// [
+    ///   { "id": "point_id", "name": "point_name", "lat": 66.3333, "lng": 55.3333, ... },
+    ///   ...
+    /// ]
+    /// ```
+    /// Для каждой точки точно будет нужно какое-то название, координаты, и какая-нибудь дополнительная информация, которая добавится позже, например, ограничения на поведение в точке (запрет поворота, запрет наклона и т.п.)
+    ///
+    /// **Ошибки:**
+    /// - **404 Not Found**: Если экскурсия не найдена
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// - **403 Forbidden**: Если по роли не положено получать
+    /// </remarks>
     [HttpGet("{trackId}")]
     [Authorize(Roles = "Admin,Creator,User")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TrackDetailsDto))]
@@ -81,8 +109,28 @@ public class TracksController : ControllerBase
     }
 
     /// <summary>
-    /// Create a new track
+    /// Создать новую экскурсию
     /// </summary>
+    /// <remarks>
+    /// **Тело запроса:**
+    /// ```json
+    /// {
+    ///   "name": "track_name"
+    /// }
+    /// ```
+    ///
+    /// **Ответ:**
+    /// ```json
+    /// {
+    ///   "id": "track_id",
+    ///   "name": "track_name"
+    /// }
+    /// ```
+    ///
+    /// **Ошибки:**
+    /// - **403 Forbidden**: Если по роли не положено создавать экскурсии
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// </remarks>
     [HttpPost]
     [Authorize(Roles = "Admin,Creator")]
     [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(TrackCreateResponseDto))]
@@ -108,8 +156,16 @@ public class TracksController : ControllerBase
     }
 
     /// <summary>
-    /// Delete track
+    /// Удалить экскурсию
     /// </summary>
+    /// <remarks>
+    /// При удалении экскурсии модели, привязанные к экскурсии должны быть тоже почищены, по идее.
+    ///
+    /// **Ошибки:**
+    /// - **403 Forbidden**: Если по роли не положено удалять экскурсии
+    /// - **404 Not Found**: Если указанная экскурсия уже была удалена, например
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// </remarks>
     [HttpDelete("{trackId}")]
     [Authorize(Roles = "Admin,Creator")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -140,8 +196,31 @@ public class TracksController : ControllerBase
     }
 
     /// <summary>
-    /// Add a new point to track
+    /// Добавить новую точку в экскурсию
     /// </summary>
+    /// <remarks>
+    /// **Тело запроса:**
+    /// ```json
+    /// {
+    ///   "name": "point_name",
+    ///   "type": "point_type",
+    ///   "position": [x, y, z],
+    ///   "rotation": [a, b, c]
+    /// }
+    /// ```
+    ///
+    /// **Ответ:**
+    /// ```json
+    /// {
+    ///   "id": "point_id"
+    /// }
+    /// ```
+    ///
+    /// **Ошибки:**
+    /// - **403 Forbidden**: Если по роли не положено создавать точки в экскурсии
+    /// - **404 Not Found**: Если указанная экскурсия уже была удалена, например
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// </remarks>
     [HttpPost("{trackId}")]
     [Authorize(Roles = "Admin,Creator")]
     [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(PointCreateResponseDto))]
@@ -174,8 +253,25 @@ public class TracksController : ControllerBase
     }
 
     /// <summary>
-    /// Update point in track
+    /// Переименовать или изменить настройки точки
     /// </summary>
+    /// <remarks>
+    /// **Тело запроса:**
+    /// ```json
+    /// {
+    ///   "name": "point_name",
+    ///   "type": "point_type",
+    ///   "position": [x, y, z],
+    ///   "rotation": [a, b, c]
+    /// }
+    /// ```
+    ///
+    /// **Ошибки:**
+    /// - **403 Forbidden**: Если по роли не положено изменять точки в экскурсии
+    /// - **404 Not Found**: Если указанная экскурсия уже была удалена, например
+    /// - **404 Not Found**: Если указанная точка уже была удалена, например
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// </remarks>
     [HttpPut("{trackId}/{pointId}")]
     [Authorize(Roles = "Admin,Creator")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -214,8 +310,15 @@ public class TracksController : ControllerBase
     }
 
     /// <summary>
-    /// Delete point from track
+    /// Удалить точку из экскурсии
     /// </summary>
+    /// <remarks>
+    /// **Ошибки:**
+    /// - **403 Forbidden**: Если по роли не положено удалять точки в экскурсии
+    /// - **404 Not Found**: Если указанная экскурсия уже была удалена, например
+    /// - **404 Not Found**: Если указанная точка уже была удалена, например
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// </remarks>
     [HttpDelete("{trackId}/{pointId}")]
     [Authorize(Roles = "Admin,Creator")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

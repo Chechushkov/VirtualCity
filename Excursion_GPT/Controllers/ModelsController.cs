@@ -19,8 +19,27 @@ public class ModelsController : ControllerBase
     }
 
     /// <summary>
-    /// Upload a model for a building
+    /// Загрузить на сервер модельку для здания
     /// </summary>
+    /// <remarks>
+    /// **Параметры запроса:**
+    /// - `file`: Бинарный файл модели
+    ///
+    /// **Ответ:**
+    /// ```json
+    /// {
+    ///   "model": "model_id"
+    /// }
+    /// ```
+    /// Если в ответе не пришел ключ model (или получили не 2xx), значит, загрузить не удалось.
+    ///
+    /// **Ошибки:**
+    /// - **413 Payload Too Large**: Если загрузка не удалась (проблемы с хранилищем, еще что-нибудь)
+    /// - **404 Not Found**: Если указанное здание не найдено
+    /// - **404 Not Found**: Если указанная экскурсия не обнаружена
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// - **403 Forbidden**: Если по роли не положено загружать
+    /// </remarks>
     [HttpPost("upload")]
     [Authorize(Roles = "Admin,Creator")]
     [DisableRequestSizeLimit]
@@ -62,8 +81,27 @@ public class ModelsController : ControllerBase
     }
 
     /// <summary>
-    /// Upload a model for a building (alternative route: POST /upload)
+    /// Загрузить на сервер модельку для здания (альтернативный маршрут: POST /upload)
     /// </summary>
+    /// <remarks>
+    /// **Параметры запроса:**
+    /// - `file`: Бинарный файл модели
+    ///
+    /// **Ответ:**
+    /// ```json
+    /// {
+    ///   "model": "model_id"
+    /// }
+    /// ```
+    /// Если в ответе не пришел ключ model (или получили не 2xx), значит, загрузить не удалось.
+    ///
+    /// **Ошибки:**
+    /// - **413 Payload Too Large**: Если загрузка не удалась (проблемы с хранилищем, еще что-нибудь)
+    /// - **404 Not Found**: Если указанное здание не найдено
+    /// - **404 Not Found**: Если указанная экскурсия не обнаружена
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// - **403 Forbidden**: Если по роли не положено загружать
+    /// </remarks>
     [HttpPost("/upload")]
     [Authorize(Roles = "Admin,Creator")]
     [DisableRequestSizeLimit]
@@ -105,8 +143,33 @@ public class ModelsController : ControllerBase
     }
 
     /// <summary>
-    /// Update model position on the map
+    /// Изменить положение модели на карте
     /// </summary>
+    /// <remarks>
+    /// **Тело запроса:**
+    /// ```json
+    /// {
+    ///   "position": [x, y, z],
+    ///   "rotation": [a, b, c],
+    ///   "scale": number
+    /// }
+    /// ```
+    ///
+    /// **Ответ:**
+    /// ```json
+    /// {
+    ///   "id": "model_id",
+    ///   "position": [lat, y, lng],
+    ///   "rotation": [a, b, c],
+    ///   "scale": 1.0
+    /// }
+    /// ```
+    ///
+    /// **Ошибки:**
+    /// - **404 Not Found**: Если модель не найдена
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// - **403 Forbidden**: Если по роли не положено изменять
+    /// </remarks>
     [HttpPut("{modelId}")]
     [Authorize(Roles = "Admin,Creator")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ModelUpdateResponseDto))]
@@ -139,8 +202,33 @@ public class ModelsController : ControllerBase
     }
 
     /// <summary>
-    /// Update model position on the map (alternative route: PUT /model/:model_id)
+    /// Изменить положение модели на карте (альтернативный маршрут: PUT /model/:model_id)
     /// </summary>
+    /// <remarks>
+    /// **Тело запроса:**
+    /// ```json
+    /// {
+    ///   "position": [x, y, z],
+    ///   "rotation": [a, b, c],
+    ///   "scale": number
+    /// }
+    /// ```
+    ///
+    /// **Ответ:**
+    /// ```json
+    /// {
+    ///   "id": "model_id",
+    ///   "position": [lat, y, lng],
+    ///   "rotation": [a, b, c],
+    ///   "scale": 1.0
+    /// }
+    /// ```
+    ///
+    /// **Ошибки:**
+    /// - **404 Not Found**: Если модель не найдена
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// - **403 Forbidden**: Если по роли не положено изменять
+    /// </remarks>
     [HttpPut("/model/{modelId}")]
     [Authorize(Roles = "Admin,Creator")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ModelUpdateResponseDto))]
@@ -173,8 +261,16 @@ public class ModelsController : ControllerBase
     }
 
     /// <summary>
-    /// Get model binary file from server
+    /// Получить модель с сервера
     /// </summary>
+    /// <remarks>
+    /// В ответ должен приходить бинарник модельки.
+    ///
+    /// **Ошибки:**
+    /// - **404 Not Found**: Если модель не найдена
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// - **403 Forbidden**: Если по роли не положено получать
+    /// </remarks>
     [HttpGet("{modelId}")]
     [Authorize(Roles = "Admin,Creator,User")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FileStreamResult))]
@@ -205,8 +301,32 @@ public class ModelsController : ControllerBase
     }
 
     /// <summary>
-    /// Get model metadata by address
+    /// Получить метаданные модели по ее адресу
     /// </summary>
+    /// <remarks>
+    /// **Тело запроса:**
+    /// ```json
+    /// {
+    ///   "address": "string"
+    /// }
+    /// ```
+    ///
+    /// **Ответ:**
+    /// ```json
+    /// {
+    ///   "model_id": "string",
+    ///   "address": "string",
+    ///   "position": [x, 0, z],
+    ///   "rotation": "угол в радианах",
+    ///   "scale": "масштаб"
+    /// }
+    /// ```
+    ///
+    /// **Ошибки:**
+    /// - **404 Not Found**: Если модель не найдена
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// - **403 Forbidden**: Если по роли не положено получать
+    /// </remarks>
     [HttpPut("address")]
     [Authorize(Roles = "Admin,Creator,User")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ModelByAddressResponseDto))]
@@ -238,8 +358,25 @@ public class ModelsController : ControllerBase
     }
 
     /// <summary>
-    /// Save model metadata
+    /// Сохранить метаданные модели
     /// </summary>
+    /// <remarks>
+    /// **Тело запроса:**
+    /// ```json
+    /// {
+    ///   "position": [x, 0, z],
+    ///   "rotation": "rotationAngle",
+    ///   "scale": number,
+    ///   "polygons": ["polygon1Id", "polygon2Id", ...],
+    ///   "address": "string"
+    /// }
+    /// ```
+    ///
+    /// **Ошибки:**
+    /// - **404 Not Found**: Если модель не найдена
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// - **403 Forbidden**: Если по роли не положено сохранять
+    /// </remarks>
     [HttpPatch("{modelId}")]
     [Authorize(Roles = "Admin,Creator")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -272,9 +409,16 @@ public class ModelsController : ControllerBase
     }
 
     /// <summary>
-    /// Get model from backend by ID (same as GetModelFile but with different route)
-    /// This endpoint is mentioned in the requirements as GET /model/:model_id
+    /// Получить модель с бэкенда по Id
     /// </summary>
+    /// <remarks>
+    /// В ответ должен приходить бинарник модельки.
+    ///
+    /// **Ошибки:**
+    /// - **404 Not Found**: Если модель не найдена
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// - **403 Forbidden**: Если по роли не положено получать
+    /// </remarks>
     [HttpGet("model/{modelId}")]
     [Authorize(Roles = "Admin,Creator,User")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FileStreamResult))]
@@ -305,8 +449,16 @@ public class ModelsController : ControllerBase
     }
 
     /// <summary>
-    /// Get model from backend by ID (alternative route: GET /model/:model_id)
+    /// Получить модель с бэкенда по Id (альтернативный маршрут: GET /model/:model_id)
     /// </summary>
+    /// <remarks>
+    /// В ответ должен приходить бинарник модельки.
+    ///
+    /// **Ошибки:**
+    /// - **404 Not Found**: Если модель не найдена
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// - **403 Forbidden**: Если по роли не положено получать
+    /// </remarks>
     [HttpGet("/model/{modelId}")]
     [Authorize(Roles = "Admin,Creator,User")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(FileStreamResult))]

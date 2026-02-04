@@ -19,10 +19,42 @@ public class BuildingsController : ControllerBase
     }
 
     /// <summary>
-    /// Get buildings around a point with coordinates x and z, at distance
+    /// Получить с бэкенда здания вокруг точки
     /// </summary>
-    /// <param name="request">Request with position and distance</param>
-    /// <returns>List of buildings around the specified point</returns>
+    /// <remarks>
+    /// Получить здания вокруг точки с координатами x и z, на расстоянии distance.
+    /// Судя по описанным ролям, пользователи со свободным доступом к карте должны иметь возможность использовать именно этот запрос.
+    ///
+    /// **Тело запроса:**
+    /// ```json
+    /// {
+    ///   "position": {
+    ///     "x": number,
+    ///     "z": number
+    ///   },
+    ///   "distance": number
+    /// }
+    /// ```
+    ///
+    /// **Ответ:**
+    /// ```json
+    /// [
+    ///   // По одному на каждое стандартное здание
+    ///   { "id": "234234", "nd": [{"lat": 66.3333, "lng": 65.4444}, ...]},
+    ///   ...
+    ///   // Для зданий с указанной моделькой
+    ///   { "id": "234235", "model": "model_id", "lat": 67.3333, "lng": 68.4444, "rot": [0, 1.5, 0]},
+    /// ]
+    /// ```
+    ///
+    /// **Ошибки:**
+    /// - **401 Unauthorized**: Универсальная ошибка, если не прилогинились
+    /// - **403 Forbidden**: Если по роли не положено получать
+    /// - **406 Not Acceptable**: Если запрашиваем северный полюс
+    /// - **404 Not Found**: Если экскурсия не создана/удалена
+    /// </remarks>
+    /// <param name="request">Запрос с позицией и расстоянием</param>
+    /// <returns>Список зданий вокруг указанной точки</returns>
     [HttpPut]
     [Authorize(Roles = "Admin,Creator,User")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<object>))]
@@ -87,10 +119,34 @@ public class BuildingsController : ControllerBase
     }
 
     /// <summary>
-    /// Get building coordinates by address
+    /// Получить с бэкенда координаты здания с указанным адресом
     /// </summary>
-    /// <param name="request">Request with address to search</param>
-    /// <returns>Building information including coordinates and model URL</returns>
+    /// <remarks>
+    /// **Тело запроса:**
+    /// ```json
+    /// {
+    ///   "address": "string" // Что искать
+    /// }
+    /// ```
+    ///
+    /// **Ответ:**
+    /// ```json
+    /// {
+    ///   "address": "string",
+    ///   "nodes": [{ "x": number, "z": number }, ...],
+    ///   "height": number,
+    ///   "position": { "x": number, "z": number },
+    ///   "modelUrl": "string"
+    /// }
+    /// ```
+    ///
+    /// **Ошибки:**
+    /// - **404 Not Found**: Если здание не найдено
+    /// - **401 Unauthorized**: Если не прилогинились
+    /// - **403 Forbidden**: Если по роли не положено получать
+    /// </remarks>
+    /// <param name="request">Запрос с адресом для поиска</param>
+    /// <returns>Информация о здании включая координаты и URL модели</returns>
     [HttpPut("address")]
     [Authorize(Roles = "Admin,Creator,User")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(BuildingByAddressResponseDto))]
