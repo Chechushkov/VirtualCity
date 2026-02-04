@@ -12,11 +12,13 @@ namespace Excursion_GPT.Infrastructure.Data
     {
         private readonly AppDbContext _context;
         private readonly ILogger<DataSeeder> _logger;
+        private readonly BuildingDataSeeder _buildingDataSeeder;
 
-        public DataSeeder(AppDbContext context, ILogger<DataSeeder> logger)
+        public DataSeeder(AppDbContext context, ILogger<DataSeeder> logger, BuildingDataSeeder buildingDataSeeder)
         {
             _context = context;
             _logger = logger;
+            _buildingDataSeeder = buildingDataSeeder;
         }
 
         public async Task SeedAsync()
@@ -32,16 +34,26 @@ namespace Excursion_GPT.Infrastructure.Data
                 var hasModels = await _context.Models.AnyAsync();
 
                 // Skip seeding only if tracks already exist (to avoid conflicts with migration data)
-                if (hasTracks)
+                if (hasTracks && hasBuildings)
                 {
-                    _logger.LogInformation("Database already contains tracks. Skipping seeding to avoid conflicts.");
+                    _logger.LogInformation("Database already contains tracks and buildings. Skipping seeding to avoid conflicts.");
                     return;
                 }
 
                 // Ensure we have the users that the migration created
                 await EnsureMigrationUsersExistAsync();
                 await SeedTracksAsync();
-                // Skip building seeding since migration already created some buildings
+
+                // Seed buildings from JSON file if they don't exist
+                if (!hasBuildings)
+                {
+                    await SeedBuildingsFromJsonAsync();
+                }
+                else
+                {
+                    _logger.LogInformation("Buildings already exist in database. Skipping building seeding.");
+                }
+
                 await SeedModelsAsync();
 
                 await _context.SaveChangesAsync();
@@ -127,10 +139,87 @@ namespace Excursion_GPT.Infrastructure.Data
             _logger.LogInformation("Seeded {Count} tracks", tracks.Length);
         }
 
-        private async Task SeedBuildingsAsync()
+        private async Task SeedBuildingsFromJsonAsync()
         {
-            // Skip building seeding since migration already created some buildings
-            _logger.LogInformation("Skipping building seeding - migration already created buildings");
+            _logger.LogInformation("Starting building data seeding from JSON file...");
+
+            try
+            {
+                // Try multiple possible locations for the buildings.json file
+                var possiblePaths = new[]
+                {
+                    // 1. In the current directory (for development)
+                    Path.Combine(Directory.GetCurrentDirectory(), "buildings.json"),
+                    // 2. One level up (common project structure)
+                    Path.Combine(Directory.GetCurrentDirectory(), "..", "buildings.json"),
+                    // 3. Two levels up (from bin/Debug directory)
+                    Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "buildings.json"),
+                    // 4. In the project root (when running from solution root)
+                    Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "buildings.json"),
+                    // 5. Absolute path from environment variable (for Docker)
+                    Environment.GetEnvironmentVariable("BUILDINGS_JSON_PATH") ?? string.Empty,
+                    // 6. In the app directory (for Docker containers)
+                    Path.Combine(AppContext.BaseDirectory, "buildings.json"),
+                    // 7. In the app directory data folder
+                    Path.Combine(AppContext.BaseDirectory, "data", "buildings.json")
+                };
+
+                string? jsonFilePath = null;
+
+                foreach (var path in possiblePaths)
+                {
+                    if (!string.IsNullOrEmpty(path) && File.Exists(path))
+                    {
+                        jsonFilePath = path;
+                        _logger.LogInformation("Found buildings.json file at: {Path}", path);
+                        break;
+                    }
+                }
+
+                if (jsonFilePath == null)
+                {
+                    _logger.LogWarning("buildings.json file not found in any of the expected locations. Using default building data.");
+                    await SeedDefaultBuildingsAsync();
+                    return;
+                }
+
+                _logger.LogInformation("Using buildings.json file at: {Path}", jsonFilePath);
+                await _buildingDataSeeder.SeedFromJsonAsync(jsonFilePath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to seed buildings from JSON. Using default building data.");
+                await SeedDefaultBuildingsAsync();
+            }
+        }
+
+        private async Task SeedDefaultBuildingsAsync()
+        {
+            if (await _context.Buildings.AnyAsync())
+                return;
+
+            var buildings = new[]
+            {
+                new Building
+                {
+                    Id = Guid.Parse("10000000-0000-0000-0000-000000000001"),
+                    Latitude = 55.751244,
+                    Longitude = 37.618423,
+                    ModelId = null,
+                    Rotation = null
+                },
+                new Building
+                {
+                    Id = Guid.Parse("10000000-0000-0000-0000-000000000002"),
+                    Latitude = 55.755826,
+                    Longitude = 37.6173,
+                    ModelId = null,
+                    Rotation = null
+                }
+            };
+
+            await _context.Buildings.AddRangeAsync(buildings);
+            _logger.LogInformation("Seeded {Count} default buildings", buildings.Length);
         }
 
         private async Task SeedModelsAsync()

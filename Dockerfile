@@ -24,6 +24,9 @@ COPY Excursion_GPT.Domain/ ./Excursion_GPT.Domain/
 COPY Excursion_GPT.Infrastructure/ ./Excursion_GPT.Infrastructure/
 COPY Excursion_GPT.Tests/ ./Excursion_GPT.Tests/
 
+# Copy buildings.json data file
+COPY buildings.json ./buildings.json
+
 # Build the application
 WORKDIR /src/Excursion_GPT
 RUN dotnet build -c Release -o /app/build
@@ -45,6 +48,9 @@ USER appuser
 
 # Copy published application
 COPY --from=publish --chown=appuser:appuser /app/publish .
+
+# Copy buildings.json to app directory for data seeding
+COPY --from=build --chown=appuser:appuser /src/buildings.json ./buildings.json
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \

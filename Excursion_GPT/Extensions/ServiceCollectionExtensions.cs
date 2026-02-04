@@ -57,6 +57,7 @@ public static class ServiceCollectionExtensions
 
         // Data Seeder
         services.AddScoped<DataSeeder>();
+        services.AddScoped<BuildingDataSeeder>();
 
         return services;
     }
