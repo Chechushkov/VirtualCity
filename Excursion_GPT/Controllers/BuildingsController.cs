@@ -176,4 +176,64 @@ public class BuildingsController : ControllerBase
             return NotFound(new BuildingErrorDto());
         }
     }
+
+    /// <summary>
+    /// Получить точку старта для экскурсии
+    /// </summary>
+    /// <remarks>
+    /// Возвращает фиксированную точку старта в координатах Web Mercator для начала экскурсии.
+    ///
+    /// **Ответ:**
+    /// ```json
+    /// {
+    ///   "x": -6736606.72045857,
+    ///   "z": 7713514.742933013
+    /// }
+    /// ```
+    /// </remarks>
+    /// <returns>Координаты точки старта в системе Web Mercator</returns>
+    [HttpGet("start")]
+    [Authorize(Roles = "Admin,Creator,User")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(StartPointResponse))]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(AuthenticationErrorDto))]
+    [ProducesResponseType(StatusCodes.Status403Forbidden, Type = typeof(RoleErrorDto))]
+    public ActionResult<StartPointResponse> GetStartPoint()
+    {
+        _logger.LogInformation("Getting start point for excursion");
+
+        try
+        {
+            var startPoint = new StartPointResponse
+            {
+                X = -6736606.72045857,
+                Z = 7713514.742933013
+            };
+
+            return Ok(startPoint);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Unauthorized(new AuthenticationErrorDto());
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("role"))
+        {
+            return StatusCode(403, new RoleErrorDto());
+        }
+    }
+}
+
+/// <summary>
+/// DTO для ответа с точкой старта
+/// </summary>
+public class StartPointResponse
+{
+    /// <summary>
+    /// X координата в системе Web Mercator
+    /// </summary>
+    public double X { get; set; }
+
+    /// <summary>
+    /// Z координата в системе Web Mercator
+    /// </summary>
+    public double Z { get; set; }
 }
