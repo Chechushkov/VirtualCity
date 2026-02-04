@@ -1,53 +1,28 @@
-#!/bin/bash
-
-# Excursion GPT Docker Build Script
-# This script prepares the project for Docker build by copying all necessary files
-
-set -e
-
-echo "🚀 Preparing Excursion GPT for Docker build..."
-
-# Create temporary directory for Docker build
-BUILD_DIR="docker-build"
-rm -rf "$BUILD_DIR"
-mkdir -p "$BUILD_DIR"
-
-echo "📁 Creating build structure..."
-
-# Copy main project
-echo "📦 Copying main project..."
-cp -r . "$BUILD_DIR/"
-
-# Copy referenced projects
-echo "📦 Copying Excursion_GPT.Application..."
-cp -r ../Excursion_GPT.Application "$BUILD_DIR/"
-
-echo "📦 Copying Excursion_GPT.Domain..."
-cp -r ../Excursion_GPT.Domain "$BUILD_DIR/"
-
-echo "📦 Copying Excursion_GPT.Infrastructure..."
-cp -r ../Excursion_GPT.Infrastructure "$BUILD_DIR/"
-
-# Create a Dockerfile that works with the copied structure
-echo "🐳 Creating Dockerfile..."
-cat > "$BUILD_DIR/Dockerfile" << 'EOF'
 # Build stage
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
+# Copy solution file
+COPY Excursion_GPT/Excursion_GPT.sln ./
+
 # Copy all project files
-COPY Excursion_GPT.csproj ./Excursion_GPT/
+COPY Excursion_GPT/Excursion_GPT.csproj ./Excursion_GPT/
 COPY Excursion_GPT.Application/Excursion_GPT.Application.csproj ./Excursion_GPT.Application/
 COPY Excursion_GPT.Domain/Excursion_GPT.Domain.csproj ./Excursion_GPT.Domain/
 COPY Excursion_GPT.Infrastructure/Excursion_GPT.Infrastructure.csproj ./Excursion_GPT.Infrastructure/
+COPY Excursion_GPT.Tests/Excursion_GPT.Tests.csproj ./Excursion_GPT.Tests/
 
 # Restore dependencies
 WORKDIR /src/Excursion_GPT
 RUN dotnet restore
 
-# Copy everything else
+# Copy all source code
 WORKDIR /src
-COPY . .
+COPY Excursion_GPT/ ./Excursion_GPT/
+COPY Excursion_GPT.Application/ ./Excursion_GPT.Application/
+COPY Excursion_GPT.Domain/ ./Excursion_GPT.Domain/
+COPY Excursion_GPT.Infrastructure/ ./Excursion_GPT.Infrastructure/
+COPY Excursion_GPT.Tests/ ./Excursion_GPT.Tests/
 
 # Build the application
 WORKDIR /src/Excursion_GPT
@@ -80,12 +55,3 @@ EXPOSE 80
 
 # Entry point
 ENTRYPOINT ["dotnet", "Excursion_GPT.dll"]
-EOF
-
-echo "✅ Build preparation complete!"
-echo ""
-echo "To build and run with Docker Compose:"
-echo "cd $BUILD_DIR && docker-compose -f docker-compose.simple.yml up -d --build"
-echo ""
-echo "Or build the image directly:"
-echo "cd $BUILD_DIR && docker build -t excursion-gpt-api ."

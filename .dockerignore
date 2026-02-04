@@ -1,0 +1,60 @@
+# .dockerignore for Excursion GPT project
+
+# Exclude build directories
+docker-build/
+**/docker-build/
+
+# Exclude test directories (optional, but can reduce image size)
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+
+# Exclude development files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Exclude IDE files
+.idea/
+*.swp
+*.swo
+
+# Exclude logs
+logs/
+*.log
+
+# Exclude temporary files
+*.tmp
+*.temp
+
+# Exclude backup files
+*.bak
+*.backup
+
+# Exclude user-specific files
+*.user
+*.suo
+
+# Exclude publish output
+publish/
+**/publish/
+
+# Exclude coverage reports
+coverage/
+**/coverage/
+
+# Exclude node_modules (if any)
+node_modules/
+
+# Keep these (important for build)
+!**/*.csproj
+!**/*.sln
+!**/*.cs
+!**/*.json
+!**/*.config
