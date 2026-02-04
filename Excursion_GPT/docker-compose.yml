@@ -67,7 +67,7 @@ services:
   # ASP.NET Core Application
   api:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
     container_name: excursion-gpt-api
     environment:
@@ -93,7 +93,7 @@ services:
     networks:
       - excursion-network
     volumes:
-      - ./logs:/app/logs
+      - ../logs:/app/logs
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/health"]
@@ -103,16 +103,16 @@ services:
       start_period: 40s
 
   # Nginx Reverse Proxy (Optional)
-  nginx:
-    image: nginx:alpine
+  # nginx:
+  #   image: nginx:alpine
     container_name: excursion-gpt-nginx
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./ssl:/etc/nginx/ssl:ro
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../nginx/conf.d:/etc/nginx/conf.d:ro
+      - ../ssl:/etc/nginx/ssl:ro
     depends_on:
       - api
     networks:

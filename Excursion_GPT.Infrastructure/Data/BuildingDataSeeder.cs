@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Excursion_GPT.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -181,12 +182,17 @@ namespace Excursion_GPT.Infrastructure.Data
         {
             // Web Mercator (EPSG:3857) to WGS84 (EPSG:4326) conversion
             // Coordinates are in meters from the origin (0,0 at 180W, 85.06N)
+            // For Ekaterinburg data, x coordinates are negative but should be positive
+            // So we invert the sign of x
 
             const double earthRadius = 6378137.0; // meters
             const double originShift = Math.PI * earthRadius; // 20037508.342789244
 
+            // Invert x sign for Ekaterinburg data (east longitude should be positive)
+            double correctedX = -x;
+
             // Normalize coordinates
-            double lon = (x / originShift) * 180.0;
+            double lon = (correctedX / originShift) * 180.0;
             double lat = (z / originShift) * 180.0;
 
             // Convert to latitude
@@ -207,14 +213,22 @@ namespace Excursion_GPT.Infrastructure.Data
         // JSON data classes
         private class BuildingsJsonData
         {
+            [JsonPropertyName("buildings")]
             public List<BuildingJsonData> Buildings { get; set; } = new List<BuildingJsonData>();
         }
 
         private class BuildingJsonData
         {
+            [JsonPropertyName("id")]
             public string Id { get; set; } = string.Empty;
+
+            [JsonPropertyName("nodes")]
             public List<NodeJsonData> Nodes { get; set; } = new List<NodeJsonData>();
+
+            [JsonPropertyName("address")]
             public string? Address { get; set; }
+
+            [JsonPropertyName("height")]
             public double Height { get; set; }
 
             // For debugging/logging
@@ -226,7 +240,10 @@ namespace Excursion_GPT.Infrastructure.Data
 
         private class NodeJsonData
         {
+            [JsonPropertyName("x")]
             public double X { get; set; }
+
+            [JsonPropertyName("z")]
             public double Z { get; set; }
         }
     }

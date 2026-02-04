@@ -30,13 +30,13 @@ namespace Excursion_GPT.Infrastructure.Data
                 // Check if data already exists to avoid duplicates
                 var hasUsers = await _context.Users.AnyAsync();
                 var hasTracks = await _context.Tracks.AnyAsync();
-                var hasBuildings = await _context.Buildings.AnyAsync();
+                var buildingCount = await _context.Buildings.CountAsync();
                 var hasModels = await _context.Models.AnyAsync();
 
                 // Skip seeding only if tracks already exist (to avoid conflicts with migration data)
-                if (hasTracks && hasBuildings)
+                if (hasTracks && buildingCount > 1000)
                 {
-                    _logger.LogInformation("Database already contains tracks and buildings. Skipping seeding to avoid conflicts.");
+                    _logger.LogInformation("Database already contains tracks and {Count} buildings. Skipping seeding to avoid conflicts.", buildingCount);
                     return;
                 }
 
@@ -44,17 +44,36 @@ namespace Excursion_GPT.Infrastructure.Data
                 await EnsureMigrationUsersExistAsync();
                 await SeedTracksAsync();
 
-                // Seed buildings from JSON file if they don't exist
-                if (!hasBuildings)
+                // Seed buildings from JSON file if we have less than 1000 buildings
+                if (buildingCount < 1000)
                 {
+                    // Clear existing buildings if they're just the default ones
+                    if (buildingCount > 0 && buildingCount <= 2)
+                    {
+                        _logger.LogInformation("Clearing {Count} default buildings before loading from JSON...", buildingCount);
+                        var defaultBuildings = await _context.Buildings.ToListAsync();
+                        _context.Buildings.RemoveRange(defaultBuildings);
+                        await _context.SaveChangesAsync();
+                        _logger.LogInformation("Default buildings cleared.");
+                    }
+
                     await SeedBuildingsFromJsonAsync();
                 }
                 else
                 {
-                    _logger.LogInformation("Buildings already exist in database. Skipping building seeding.");
+                    _logger.LogInformation("Database already contains {Count} buildings. Skipping building seeding.", buildingCount);
                 }
 
-                await SeedModelsAsync();
+                // Only seed models if we have buildings
+                var buildingCountAfterSeeding = await _context.Buildings.CountAsync();
+                if (buildingCountAfterSeeding > 0)
+                {
+                    await SeedModelsAsync();
+                }
+                else
+                {
+                    _logger.LogWarning("No buildings available to seed models. Skipping model seeding.");
+                }
 
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Data seeding completed successfully.");
@@ -227,7 +246,18 @@ namespace Excursion_GPT.Infrastructure.Data
             if (await _context.Models.AnyAsync())
                 return;
 
-            // Use the building IDs that were created by the migration
+            // Get some buildings to attach models to
+            var buildings = await _context.Buildings
+                .OrderBy(b => b.Id)
+                .Take(2)
+                .ToListAsync();
+
+            if (buildings.Count < 2)
+            {
+                _logger.LogWarning("Not enough buildings to seed models. Need at least 2, found {Count}.", buildings.Count);
+                return;
+            }
+
             var models = new[]
             {
                 new Model
@@ -237,7 +267,7 @@ namespace Excursion_GPT.Infrastructure.Data
                     Position = new List<double> { 0, 0, 0 },
                     Rotation = new List<double> { 0, 0, 0 },
                     Scale = 1.0,
-                    BuildingId = Guid.Parse("10000000-0000-0000-0000-000000000001"), // Use existing building ID
+                    BuildingId = buildings[0].Id,
                     TrackId = Guid.Parse("20000000-0000-0000-0000-000000000001")
                 },
                 new Model
@@ -247,7 +277,7 @@ namespace Excursion_GPT.Infrastructure.Data
                     Position = new List<double> { 0, 0, 0 },
                     Rotation = new List<double> { 0, 0, 0 },
                     Scale = 1.0,
-                    BuildingId = Guid.Parse("10000000-0000-0000-0000-000000000002"), // Use existing building ID
+                    BuildingId = buildings[1].Id,
                     TrackId = Guid.Parse("20000000-0000-0000-0000-000000000002")
                 }
             };
@@ -256,11 +286,8 @@ namespace Excursion_GPT.Infrastructure.Data
             _logger.LogInformation("Seeded {Count} models", models.Length);
 
             // Update buildings with model references
-            var building1 = await _context.Buildings.FindAsync(Guid.Parse("10000000-0000-0000-0000-000000000001"));
-            var building2 = await _context.Buildings.FindAsync(Guid.Parse("10000000-0000-0000-0000-000000000002"));
-
-            if (building1 != null) building1.ModelId = Guid.Parse("30000000-0000-0000-0000-000000000001");
-            if (building2 != null) building2.ModelId = Guid.Parse("30000000-0000-0000-0000-000000000002");
+            buildings[0].ModelId = Guid.Parse("30000000-0000-0000-0000-000000000001");
+            buildings[1].ModelId = Guid.Parse("30000000-0000-0000-0000-000000000002");
         }
     }
 }
