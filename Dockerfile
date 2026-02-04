@@ -12,9 +12,13 @@ COPY Excursion_GPT.Domain/Excursion_GPT.Domain.csproj ./Excursion_GPT.Domain/
 COPY Excursion_GPT.Infrastructure/Excursion_GPT.Infrastructure.csproj ./Excursion_GPT.Infrastructure/
 COPY Excursion_GPT.Tests/Excursion_GPT.Tests.csproj ./Excursion_GPT.Tests/
 
-# Restore dependencies
-WORKDIR /src/Excursion_GPT
-RUN dotnet restore
+# Restore dependencies for each project separately to avoid analyzer issues
+WORKDIR /src
+RUN dotnet restore Excursion_GPT/Excursion_GPT.csproj
+RUN dotnet restore Excursion_GPT.Application/Excursion_GPT.Application.csproj
+RUN dotnet restore Excursion_GPT.Domain/Excursion_GPT.Domain.csproj
+RUN dotnet restore Excursion_GPT.Infrastructure/Excursion_GPT.Infrastructure.csproj
+RUN dotnet restore Excursion_GPT.Tests/Excursion_GPT.Tests.csproj
 
 # Copy all source code
 WORKDIR /src
@@ -27,13 +31,13 @@ COPY Excursion_GPT.Tests/ ./Excursion_GPT.Tests/
 # Copy buildings.json data file
 COPY buildings.json ./buildings.json
 
-# Build the application
+# Build the application without restoring (already restored)
 WORKDIR /src/Excursion_GPT
-RUN dotnet build -c Release -o /app/build
+RUN dotnet build -c Release -o /app/build --no-restore /p:UseSharedCompilation=false
 
 # Publish stage
 FROM build AS publish
-RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish -c Release -o /app/publish --no-build /p:UseAppHost=false
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
