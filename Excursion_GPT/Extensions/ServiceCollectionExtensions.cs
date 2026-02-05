@@ -56,7 +56,6 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPointService, PointService>();
 
         // Data Seeder
-        services.AddScoped<DataSeeder>();
         services.AddScoped<BuildingDataSeeder>();
 
         return services;

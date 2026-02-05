@@ -40,10 +40,10 @@ public class BuildingsController : ControllerBase
     /// ```json
     /// [
     ///   // По одному на каждое стандартное здание
-    ///   { "id": "234234", "nd": [{"lat": 66.3333, "lng": 65.4444}, ...]},
+    ///   { "id": "234234", "nodes": [{"x": -6736606.72045857, "z": 7713514.742933013}, ...]},
     ///   ...
     ///   // Для зданий с указанной моделькой
-    ///   { "id": "234235", "model": "model_id", "lat": 67.3333, "lng": 68.4444, "rot": [0, 1.5, 0]},
+    ///   { "id": "234235", "model": "model_id", "x": -6736586.72045857, "z": 7713534.742933013, "rot": [0, 1.5, 0]},
     /// ]
     /// ```
     ///
@@ -72,33 +72,7 @@ public class BuildingsController : ControllerBase
         try
         {
             var buildings = await _buildingService.GetBuildingsAroundPointAsync(request);
-
-            // Create a mixed list of standard and model buildings
-            var result = new List<object>();
-            foreach (var building in buildings)
-            {
-                if (building is StandardBuildingResponseDto standardBuilding)
-                {
-                    result.Add(new
-                    {
-                        id = standardBuilding.Id,
-                        nd = standardBuilding.Nd.Select(n => new { lat = n.Lat, lng = n.Lng })
-                    });
-                }
-                else if (building is ModelBuildingResponseDto modelBuilding)
-                {
-                    result.Add(new
-                    {
-                        id = modelBuilding.Id,
-                        model = modelBuilding.Model,
-                        lat = modelBuilding.Lat,
-                        lng = modelBuilding.Lng,
-                        rot = modelBuilding.Rot
-                    });
-                }
-            }
-
-            return Ok(result);
+            return Ok(buildings);
         }
         catch (UnauthorizedAccessException)
         {
@@ -197,7 +171,8 @@ public class BuildingsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(StartPointResponse))]
     [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(AuthenticationErrorDto))]
     [ProducesResponseType(StatusCodes.Status403Forbidden, Type = typeof(RoleErrorDto))]
-    public ActionResult<StartPointResponse> GetStartPoint()
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(StartPointErrorDto))]
+    public async Task<ActionResult<StartPointResponse>> GetStartPoint()
     {
         _logger.LogInformation("Getting start point for excursion");
 
@@ -218,6 +193,11 @@ public class BuildingsController : ControllerBase
         catch (InvalidOperationException ex) when (ex.Message.Contains("role"))
         {
             return StatusCode(403, new RoleErrorDto());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting start point");
+            return StatusCode(500, new StartPointErrorDto());
         }
     }
 }

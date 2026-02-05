@@ -115,19 +115,19 @@ namespace Excursion_GPT.Tests.Services
             foreach (var building in standardBuildings)
             {
                 var id = building.GetType().GetProperty("id")?.GetValue(building);
-                var nd = building.GetType().GetProperty("nd")?.GetValue(building) as IEnumerable<object>;
+                var nodes = building.GetType().GetProperty("nodes")?.GetValue(building) as IEnumerable<object>;
 
                 Assert.NotNull(id);
-                Assert.NotNull(nd);
-                Assert.NotEmpty(nd);
+                Assert.NotNull(nodes);
+                Assert.NotEmpty(nodes);
 
-                foreach (var node in nd)
+                foreach (var node in nodes)
                 {
-                    var lat = node.GetType().GetProperty("lat")?.GetValue(node);
-                    var lng = node.GetType().GetProperty("lng")?.GetValue(node);
+                    var x = node.GetType().GetProperty("x")?.GetValue(node);
+                    var z = node.GetType().GetProperty("z")?.GetValue(node);
 
-                    Assert.NotNull(lat);
-                    Assert.NotNull(lng);
+                    Assert.NotNull(x);
+                    Assert.NotNull(z);
                 }
             }
 
@@ -139,14 +139,14 @@ namespace Excursion_GPT.Tests.Services
             {
                 var id = building.GetType().GetProperty("id")?.GetValue(building);
                 var model = building.GetType().GetProperty("model")?.GetValue(building);
-                var lat = building.GetType().GetProperty("lat")?.GetValue(building);
-                var lng = building.GetType().GetProperty("lng")?.GetValue(building);
+                var x = building.GetType().GetProperty("x")?.GetValue(building);
+                var z = building.GetType().GetProperty("z")?.GetValue(building);
                 var rot = building.GetType().GetProperty("rot")?.GetValue(building) as IEnumerable<double>;
 
                 Assert.NotNull(id);
                 Assert.NotNull(model);
-                Assert.NotNull(lat);
-                Assert.NotNull(lng);
+                Assert.NotNull(x);
+                Assert.NotNull(z);
                 Assert.NotNull(rot);
                 Assert.Equal(3, rot.Count());
             }

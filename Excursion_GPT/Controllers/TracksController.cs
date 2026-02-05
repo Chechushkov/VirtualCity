@@ -68,7 +68,7 @@ public class TracksController : ControllerBase
     /// **Ответ:**
     /// ```json
     /// [
-    ///   { "id": "point_id", "name": "point_name", "lat": 66.3333, "lng": 55.3333, ... },
+    ///   { "id": "point_id", "name": "point_name", "x": -6736606.72045857, "z": 7713514.742933013, ... },
     ///   ...
     /// ]
     /// ```

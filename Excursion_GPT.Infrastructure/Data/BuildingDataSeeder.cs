@@ -82,6 +82,14 @@ namespace Excursion_GPT.Infrastructure.Data
                     // Save batch to database
                     if (entities.Count > 0)
                     {
+                        // Log NodesJson for first building in batch for debugging
+                        if (entities.Count > 0)
+                        {
+                            var firstBuilding = entities[0];
+                            _logger.LogInformation("First building in batch: Id={Id}, NodesJson length={Length}",
+                                firstBuilding.Id, firstBuilding.NodesJson?.Length ?? 0);
+                        }
+
                         await _context.Buildings.AddRangeAsync(entities);
                         await _context.SaveChangesAsync();
                         savedCount += entities.Count;
@@ -113,22 +121,46 @@ namespace Excursion_GPT.Infrastructure.Data
             // Calculate center point from polygon nodes
             var center = CalculatePolygonCenter(buildingData.Nodes);
 
-            // Convert Web Mercator coordinates to latitude/longitude
-            var (latitude, longitude) = WebMercatorToLatLon(center.X, center.Z);
+            // Store Web Mercator coordinates directly (no conversion needed)
+            // For Ekaterinburg data, x coordinates are negative but should be positive
+            // So we invert the sign of x
+            double correctedX = -center.X;
 
-            // Log conversion for debugging
-            _logger.LogDebug("Converted building {Id}: X={X}, Z={Z} -> Lat={Lat}, Lon={Lon}",
-                buildingData.Id, center.X, center.Z, latitude, longitude);
+            // Log coordinates for debugging
+            _logger.LogDebug("Building {Id}: X={X}, Z={Z} (Web Mercator, corrected X={CorrectedX})",
+                buildingData.Id, center.X, center.Z, correctedX);
 
-            // Create building entity
+            // Create building entity with nodes
             var building = new Building
             {
                 Id = GenerateDeterministicGuid(buildingData.Id),
-                Latitude = latitude,
-                Longitude = longitude,
+                X = correctedX, // Web Mercator X coordinate (center)
+                Z = center.Z,   // Web Mercator Z coordinate (center)
+                Address = buildingData.Address, // Building address
+                Height = buildingData.Height,   // Building height
                 ModelId = null, // No models initially
                 Rotation = null // No rotation for standard buildings
             };
+
+            // Store polygon nodes if available
+            if (buildingData.Nodes != null && buildingData.Nodes.Count > 0)
+            {
+                // Convert nodes to List<List<double>> format and invert X for Ekaterinburg data
+                var nodesList = buildingData.Nodes.Select(n => new List<double> { -n.X, n.Z }).ToList();
+
+                // Serialize nodes to JSON string
+                var nodesJson = JsonSerializer.Serialize(nodesList);
+
+                // Set NodesJson directly - this is what Entity Framework will save
+                building.NodesJson = nodesJson;
+
+                _logger.LogInformation("Building {Id}: stored {NodeCount} polygon nodes, NodesJson length: {NodesJsonLength}",
+                    buildingData.Id, buildingData.Nodes.Count, nodesJson.Length);
+            }
+            else
+            {
+                _logger.LogWarning("Building {Id}: no nodes available to store", buildingData.Id);
+            }
 
             return building;
         }

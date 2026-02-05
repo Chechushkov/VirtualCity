@@ -24,6 +24,8 @@ public record StandardBuildingResponseDto
 {
     public string Id { get; init; } = string.Empty;
     public List<BuildingNodeDto> Nd { get; init; } = new();
+    public string? Address { get; init; }
+    public double? Height { get; init; }
 }
 
 // Response DTO for PUT /buildings - Building with model
@@ -108,5 +110,15 @@ public record BuildingErrorDto : ErrorResponseDto
         Code = 404;
         Object = "building";
         Message = "Building not found";
+    }
+}
+
+public record StartPointErrorDto : ErrorResponseDto
+{
+    public StartPointErrorDto()
+    {
+        Code = 500;
+        Object = "start_point";
+        Message = "Failed to retrieve start point";
     }
 }

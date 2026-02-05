@@ -1,43 +1,5 @@
-# Build stage
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
-WORKDIR /src
-
-# Copy solution file
-COPY Excursion_GPT/Excursion_GPT.sln ./
-
-# Copy all project files
-COPY Excursion_GPT/Excursion_GPT.csproj ./Excursion_GPT/
-COPY Excursion_GPT.Application/Excursion_GPT.Application.csproj ./Excursion_GPT.Application/
-COPY Excursion_GPT.Domain/Excursion_GPT.Domain.csproj ./Excursion_GPT.Domain/
-COPY Excursion_GPT.Infrastructure/Excursion_GPT.Infrastructure.csproj ./Excursion_GPT.Infrastructure/
-COPY Excursion_GPT.Tests/Excursion_GPT.Tests.csproj ./Excursion_GPT.Tests/
-
-# Restore dependencies for each project separately to avoid analyzer issues
-WORKDIR /src
-RUN dotnet restore Excursion_GPT/Excursion_GPT.csproj
-RUN dotnet restore Excursion_GPT.Application/Excursion_GPT.Application.csproj
-RUN dotnet restore Excursion_GPT.Domain/Excursion_GPT.Domain.csproj
-RUN dotnet restore Excursion_GPT.Infrastructure/Excursion_GPT.Infrastructure.csproj
-RUN dotnet restore Excursion_GPT.Tests/Excursion_GPT.Tests.csproj
-
-# Copy all source code
-WORKDIR /src
-COPY Excursion_GPT/ ./Excursion_GPT/
-COPY Excursion_GPT.Application/ ./Excursion_GPT.Application/
-COPY Excursion_GPT.Domain/ ./Excursion_GPT.Domain/
-COPY Excursion_GPT.Infrastructure/ ./Excursion_GPT.Infrastructure/
-COPY Excursion_GPT.Tests/ ./Excursion_GPT.Tests/
-
-# Copy buildings.json data file
-COPY buildings.json ./buildings.json
-
-# Build the application without restoring (already restored)
-WORKDIR /src/Excursion_GPT
-RUN dotnet build -c Release -o /app/build --no-restore /p:UseSharedCompilation=false
-
-# Publish stage
-FROM build AS publish
-RUN dotnet publish -c Release -o /app/publish --no-build /p:UseAppHost=false
+# Simple Dockerfile that copies pre-built application
+# This avoids NuGet restore issues in Docker
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
@@ -50,11 +12,11 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 RUN adduser --disabled-password --gecos '' appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Copy published application
-COPY --from=publish --chown=appuser:appuser /app/publish .
+# Copy published application from local build
+COPY Excursion_GPT/published-app/ .
 
-# Copy buildings.json to app directory for data seeding
-COPY --from=build --chown=appuser:appuser /src/buildings.json ./buildings.json
+# Copy buildings.json data file
+COPY buildings.json ./buildings.json
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \

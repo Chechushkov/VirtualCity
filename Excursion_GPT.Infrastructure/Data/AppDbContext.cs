@@ -47,6 +47,12 @@ public class AppDbContext : DbContext
             entity.HasKey(b => b.Id);
             entity.Property(b => b.Rotation)
                   .HasColumnType("jsonb"); // Store double array as JSONB
+            entity.Property(b => b.NodesJson)
+                  .HasColumnName("nodes_json"); // Explicitly map NodesJson property
+
+            // Explicitly ignore the Nodes property to prevent EF from trying to map it
+            entity.Ignore(b => b.Nodes);
+
             entity.HasOne(b => b.CustomModel)
                   .WithOne()
                   .HasForeignKey<Building>(b => b.ModelId)

@@ -1,0 +1,703 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Excursion_GPT</name>
+    </assembly>
+    <members>
+        <member name="M:Excursion_GPT.Controllers.BuildingsController.GetBuildingsAroundPoint(Excursion_GPT.Application.DTOs.BuildingsAroundPointRequestDto)">
+             <summary>
+             Получить с бэкенда здания вокруг точки
+             </summary>
+             <remarks>
+             Получить здания вокруг точки с координатами x и z, на расстоянии distance.
+             Судя по описанным ролям, пользователи со свободным доступом к карте должны иметь возможность использовать именно этот запрос.
+            
+             **Тело запроса:**
+             ```json
+             {
+               "position": {
+                 "x": number,
+                 "z": number
+               },
+               "distance": number
+             }
+             ```
+            
+             **Ответ:**
+             ```json
+             [
+               // По одному на каждое стандартное здание
+               { "id": "234234", "nodes": [{"x": -6736606.72045857, "z": 7713514.742933013}, ...]},
+               ...
+               // Для зданий с указанной моделькой
+               { "id": "234235", "model": "model_id", "x": -6736586.72045857, "z": 7713534.742933013, "rot": [0, 1.5, 0]},
+             ]
+             ```
+            
+             **Ошибки:**
+             - **401 Unauthorized**: Универсальная ошибка, если не прилогинились
+             - **403 Forbidden**: Если по роли не положено получать
+             - **406 Not Acceptable**: Если запрашиваем северный полюс
+             - **404 Not Found**: Если экскурсия не создана/удалена
+             </remarks>
+             <param name="request">Запрос с позицией и расстоянием</param>
+             <returns>Список зданий вокруг указанной точки</returns>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.BuildingsController.GetBuildingByAddress(Excursion_GPT.Application.DTOs.BuildingByAddressRequestDto)">
+             <summary>
+             Получить с бэкенда координаты здания с указанным адресом
+             </summary>
+             <remarks>
+             **Тело запроса:**
+             ```json
+             {
+               "address": "string" // Что искать
+             }
+             ```
+            
+             **Ответ:**
+             ```json
+             {
+               "address": "string",
+               "nodes": [{ "x": number, "z": number }, ...],
+               "height": number,
+               "position": { "x": number, "z": number },
+               "modelUrl": "string"
+             }
+             ```
+            
+             **Ошибки:**
+             - **404 Not Found**: Если здание не найдено
+             - **401 Unauthorized**: Если не прилогинились
+             - **403 Forbidden**: Если по роли не положено получать
+             </remarks>
+             <param name="request">Запрос с адресом для поиска</param>
+             <returns>Информация о здании включая координаты и URL модели</returns>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.BuildingsController.GetStartPoint">
+             <summary>
+             Получить точку старта для экскурсии
+             </summary>
+             <remarks>
+             Возвращает фиксированную точку старта в координатах Web Mercator для начала экскурсии.
+            
+             **Ответ:**
+             ```json
+             {
+               "x": -6736606.72045857,
+               "z": 7713514.742933013
+             }
+             ```
+             </remarks>
+             <returns>Координаты точки старта в системе Web Mercator</returns>
+        </member>
+        <member name="T:Excursion_GPT.Controllers.StartPointResponse">
+            <summary>
+            DTO для ответа с точкой старта
+            </summary>
+        </member>
+        <member name="P:Excursion_GPT.Controllers.StartPointResponse.X">
+            <summary>
+            X координата в системе Web Mercator
+            </summary>
+        </member>
+        <member name="P:Excursion_GPT.Controllers.StartPointResponse.Z">
+            <summary>
+            Z координата в системе Web Mercator
+            </summary>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.ModelsController.UploadModel(Excursion_GPT.Application.DTOs.ModelUploadRequestDto)">
+             <summary>
+             Загрузить на сервер модельку для здания
+             </summary>
+             <remarks>
+             **Параметры запроса:**
+             - `file`: Бинарный файл модели
+            
+             **Ответ:**
+             ```json
+             {
+               "model": "model_id"
+             }
+             ```
+             Если в ответе не пришел ключ model (или получили не 2xx), значит, загрузить не удалось.
+            
+             **Ошибки:**
+             - **413 Payload Too Large**: Если загрузка не удалась (проблемы с хранилищем, еще что-нибудь)
+             - **404 Not Found**: Если указанное здание не найдено
+             - **404 Not Found**: Если указанная экскурсия не обнаружена
+             - **401 Unauthorized**: Если не прилогинились
+             - **403 Forbidden**: Если по роли не положено загружать
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.ModelsController.UploadModelDirect(Excursion_GPT.Application.DTOs.ModelUploadRequestDto)">
+             <summary>
+             Загрузить на сервер модельку для здания (альтернативный маршрут: POST /upload)
+             </summary>
+             <remarks>
+             **Параметры запроса:**
+             - `file`: Бинарный файл модели
+            
+             **Ответ:**
+             ```json
+             {
+               "model": "model_id"
+             }
+             ```
+             Если в ответе не пришел ключ model (или получили не 2xx), значит, загрузить не удалось.
+            
+             **Ошибки:**
+             - **413 Payload Too Large**: Если загрузка не удалась (проблемы с хранилищем, еще что-нибудь)
+             - **404 Not Found**: Если указанное здание не найдено
+             - **404 Not Found**: Если указанная экскурсия не обнаружена
+             - **401 Unauthorized**: Если не прилогинились
+             - **403 Forbidden**: Если по роли не положено загружать
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.ModelsController.UpdateModelPosition(System.String,Excursion_GPT.Application.DTOs.ModelUpdateRequestDto)">
+             <summary>
+             Изменить положение модели на карте
+             </summary>
+             <remarks>
+             **Тело запроса:**
+             ```json
+             {
+               "position": [x, y, z],
+               "rotation": [a, b, c],
+               "scale": number
+             }
+             ```
+            
+             **Ответ:**
+             ```json
+             {
+               "id": "model_id",
+               "position": [lat, y, lng],
+               "rotation": [a, b, c],
+               "scale": 1.0
+             }
+             ```
+            
+             **Ошибки:**
+             - **404 Not Found**: Если модель не найдена
+             - **401 Unauthorized**: Если не прилогинились
+             - **403 Forbidden**: Если по роли не положено изменять
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.ModelsController.UpdateModelPositionDirect(System.String,Excursion_GPT.Application.DTOs.ModelUpdateRequestDto)">
+             <summary>
+             Изменить положение модели на карте (альтернативный маршрут: PUT /model/:model_id)
+             </summary>
+             <remarks>
+             **Тело запроса:**
+             ```json
+             {
+               "position": [x, y, z],
+               "rotation": [a, b, c],
+               "scale": number
+             }
+             ```
+            
+             **Ответ:**
+             ```json
+             {
+               "id": "model_id",
+               "position": [lat, y, lng],
+               "rotation": [a, b, c],
+               "scale": 1.0
+             }
+             ```
+            
+             **Ошибки:**
+             - **404 Not Found**: Если модель не найдена
+             - **401 Unauthorized**: Если не прилогинились
+             - **403 Forbidden**: Если по роли не положено изменять
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.ModelsController.GetModelFile(System.String)">
+             <summary>
+             Получить модель с сервера
+             </summary>
+             <remarks>
+             В ответ должен приходить бинарник модельки.
+            
+             **Ошибки:**
+             - **404 Not Found**: Если модель не найдена
+             - **401 Unauthorized**: Если не прилогинились
+             - **403 Forbidden**: Если по роли не положено получать
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.ModelsController.GetModelByAddress(Excursion_GPT.Application.DTOs.ModelByAddressRequestDto)">
+             <summary>
+             Получить метаданные модели по ее адресу
+             </summary>
+             <remarks>
+             **Тело запроса:**
+             ```json
+             {
+               "address": "string"
+             }
+             ```
+            
+             **Ответ:**
+             ```json
+             {
+               "model_id": "string",
+               "address": "string",
+               "position": [x, 0, z],
+               "rotation": "угол в радианах",
+               "scale": "масштаб"
+             }
+             ```
+            
+             **Ошибки:**
+             - **404 Not Found**: Если модель не найдена
+             - **401 Unauthorized**: Если не прилогинились
+             - **403 Forbidden**: Если по роли не положено получать
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.ModelsController.SaveModelMetadata(System.String,Excursion_GPT.Application.DTOs.ModelMetadataUpdateRequestDto)">
+             <summary>
+             Сохранить метаданные модели
+             </summary>
+             <remarks>
+             **Тело запроса:**
+             ```json
+             {
+               "position": [x, 0, z],
+               "rotation": "rotationAngle",
+               "scale": number,
+               "polygons": ["polygon1Id", "polygon2Id", ...],
+               "address": "string"
+             }
+             ```
+            
+             **Ошибки:**
+             - **404 Not Found**: Если модель не найдена
+             - **401 Unauthorized**: Если не прилогинились
+             - **403 Forbidden**: Если по роли не положено сохранять
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.ModelsController.GetModelById(System.String)">
+             <summary>
+             Получить модель с бэкенда по Id
+             </summary>
+             <remarks>
+             В ответ должен приходить бинарник модельки.
+            
+             **Ошибки:**
+             - **404 Not Found**: Если модель не найдена
+             - **401 Unauthorized**: Если не прилогинились
+             - **403 Forbidden**: Если по роли не положено получать
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.ModelsController.GetModelByIdDirect(System.String)">
+             <summary>
+             Получить модель с бэкенда по Id (альтернативный маршрут: GET /model/:model_id)
+             </summary>
+             <remarks>
+             В ответ должен приходить бинарник модельки.
+            
+             **Ошибки:**
+             - **404 Not Found**: Если модель не найдена
+             - **401 Unauthorized**: Если не прилогинились
+             - **403 Forbidden**: Если по роли не положено получать
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.TestController.Get">
+             <summary>
+             Тестовый endpoint для проверки работы API
+             </summary>
+             <remarks>
+             **Ответ:**
+             ```json
+             {
+               "message": "Test controller works!",
+               "timestamp": "2024-01-01T12:00:00Z"
+             }
+             ```
+            
+             Используется для проверки доступности API и базовой функциональности.
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.TestController.Health">
+             <summary>
+             Проверка здоровья сервиса
+             </summary>
+             <remarks>
+             **Ответ:**
+             ```json
+             {
+               "status": "Healthy",
+               "service": "TestController",
+               "timestamp": "2024-01-01T12:00:00Z"
+             }
+             ```
+            
+             Используется для мониторинга здоровья сервиса. Возвращает статус "Healthy" если сервис работает нормально.
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.TracksController.GetAllTracks">
+             <summary>
+             Получить список экскурсий
+             </summary>
+             <remarks>
+             **Ответ:**
+             ```json
+             [
+               { "id": "track_id", "name": "track_name" },
+               ...
+             ]
+             ```
+            
+             **Ошибки:**
+             - **401 Unauthorized**: Если не прилогинились
+             - **403 Forbidden**: Если по роли не положено получать
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.TracksController.GetTrackById(System.String)">
+             <summary>
+             Получить экскурсию со всеми точками, которые в ней
+             </summary>
+             <remarks>
+             **Ответ:**
+             ```json
+             [
+               { "id": "point_id", "name": "point_name", "x": -6736606.72045857, "z": 7713514.742933013, ... },
+               ...
+             ]
+             ```
+             Для каждой точки точно будет нужно какое-то название, координаты, и какая-нибудь дополнительная информация, которая добавится позже, например, ограничения на поведение в точке (запрет поворота, запрет наклона и т.п.)
+            
+             **Ошибки:**
+             - **404 Not Found**: Если экскурсия не найдена
+             - **401 Unauthorized**: Если не прилогинились
+             - **403 Forbidden**: Если по роли не положено получать
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.TracksController.CreateTrack(Excursion_GPT.Application.DTOs.TrackCreateRequestDto)">
+             <summary>
+             Создать новую экскурсию
+             </summary>
+             <remarks>
+             **Тело запроса:**
+             ```json
+             {
+               "name": "track_name"
+             }
+             ```
+            
+             **Ответ:**
+             ```json
+             {
+               "id": "track_id",
+               "name": "track_name"
+             }
+             ```
+            
+             **Ошибки:**
+             - **403 Forbidden**: Если по роли не положено создавать экскурсии
+             - **401 Unauthorized**: Если не прилогинились
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.TracksController.DeleteTrack(System.String)">
+             <summary>
+             Удалить экскурсию
+             </summary>
+             <remarks>
+             При удалении экскурсии модели, привязанные к экскурсии должны быть тоже почищены, по идее.
+            
+             **Ошибки:**
+             - **403 Forbidden**: Если по роли не положено удалять экскурсии
+             - **404 Not Found**: Если указанная экскурсия уже была удалена, например
+             - **401 Unauthorized**: Если не прилогинились
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.TracksController.AddPointToTrack(System.String,Excursion_GPT.Application.DTOs.PointCreateRequestDto)">
+             <summary>
+             Добавить новую точку в экскурсию
+             </summary>
+             <remarks>
+             **Тело запроса:**
+             ```json
+             {
+               "name": "point_name",
+               "type": "point_type",
+               "position": [x, y, z],
+               "rotation": [a, b, c]
+             }
+             ```
+            
+             **Ответ:**
+             ```json
+             {
+               "id": "point_id"
+             }
+             ```
+            
+             **Ошибки:**
+             - **403 Forbidden**: Если по роли не положено создавать точки в экскурсии
+             - **404 Not Found**: Если указанная экскурсия уже была удалена, например
+             - **401 Unauthorized**: Если не прилогинились
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.TracksController.UpdatePoint(System.String,System.String,Excursion_GPT.Application.DTOs.PointUpdateRequestDto)">
+             <summary>
+             Переименовать или изменить настройки точки
+             </summary>
+             <remarks>
+             **Тело запроса:**
+             ```json
+             {
+               "name": "point_name",
+               "type": "point_type",
+               "position": [x, y, z],
+               "rotation": [a, b, c]
+             }
+             ```
+            
+             **Ошибки:**
+             - **403 Forbidden**: Если по роли не положено изменять точки в экскурсии
+             - **404 Not Found**: Если указанная экскурсия уже была удалена, например
+             - **404 Not Found**: Если указанная точка уже была удалена, например
+             - **401 Unauthorized**: Если не прилогинились
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.TracksController.DeletePoint(System.String,System.String)">
+            <summary>
+            Удалить точку из экскурсии
+            </summary>
+            <remarks>
+            **Ошибки:**
+            - **403 Forbidden**: Если по роли не положено удалять точки в экскурсии
+            - **404 Not Found**: Если указанная экскурсия уже была удалена, например
+            - **404 Not Found**: Если указанная точка уже была удалена, например
+            - **401 Unauthorized**: Если не прилогинились
+            </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.UsersController.GetAllUsers">
+             <summary>
+             Получить всех пользователей (только для администраторов)
+             </summary>
+             <remarks>
+             **Ответ:**
+             ```json
+             [
+               {
+                 "id": "guid",
+                 "login": "string",
+                 "email": "string",
+                 "role": "Admin|Creator|User",
+                 "createdAt": "datetime"
+               },
+               ...
+             ]
+             ```
+            
+             **Ошибки:**
+             - **401 Unauthorized**: Если не прилогинились
+             - **403 Forbidden**: Если пользователь не является администратором
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.UsersController.CreateUser(Excursion_GPT.Application.DTOs.UserCreateDto)">
+             <summary>
+             Создать нового пользователя
+             </summary>
+             <remarks>
+             **Тело запроса:**
+             ```json
+             {
+               "login": "string",
+               "email": "string",
+               "password": "string",
+               "role": "Admin|Creator|User"
+             }
+             ```
+            
+             **Ответ:**
+             ```json
+             {
+               "id": "guid",
+               "login": "string",
+               "email": "string",
+               "role": "Admin|Creator|User",
+               "createdAt": "datetime"
+             }
+             ```
+            
+             **Ошибки:**
+             - **400 Bad Request**: Если данные невалидны или пользователь уже существует
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.UsersController.GetUserById(System.Guid)">
+             <summary>
+             Получить пользователя по ID (только для администраторов)
+             </summary>
+             <remarks>
+             **Ответ:**
+             ```json
+             {
+               "id": "guid",
+               "login": "string",
+               "email": "string",
+               "role": "Admin|Creator|User",
+               "createdAt": "datetime"
+             }
+             ```
+            
+             **Ошибки:**
+             - **404 Not Found**: Если пользователь не найден
+             - **401 Unauthorized**: Если не прилогинились
+             - **403 Forbidden**: Если пользователь не является администратором
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.UsersController.GetCurrentUserProfile">
+             <summary>
+             Получить профиль текущего пользователя
+             </summary>
+             <remarks>
+             **Ответ:**
+             ```json
+             {
+               "id": "guid",
+               "login": "string",
+               "email": "string",
+               "role": "Admin|Creator|User",
+               "createdAt": "datetime"
+             }
+             ```
+            
+             **Ошибки:**
+             - **404 Not Found**: Если пользователь не найден
+             - **401 Unauthorized**: Если не прилогинились
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.UsersController.UpdateUser(System.Guid,Excursion_GPT.Application.DTOs.UserUpdateDto)">
+             <summary>
+             Обновить данные пользователя (только для администраторов)
+             </summary>
+             <remarks>
+             **Тело запроса:**
+             ```json
+             {
+               "login": "string",
+               "email": "string",
+               "password": "string",
+               "role": "Admin|Creator|User"
+             }
+             ```
+            
+             **Ответ:**
+             ```json
+             {
+               "id": "guid",
+               "login": "string",
+               "email": "string",
+               "role": "Admin|Creator|User",
+               "createdAt": "datetime"
+             }
+             ```
+            
+             **Ошибки:**
+             - **400 Bad Request**: Если данные невалидны
+             - **404 Not Found**: Если пользователь не найден
+             - **401 Unauthorized**: Если не прилогинились
+             - **403 Forbidden**: Если пользователь не является администратором
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.UsersController.UpdateCurrentUserProfile(Excursion_GPT.Application.DTOs.UserUpdateDto)">
+             <summary>
+             Обновить профиль текущего пользователя
+             </summary>
+             <remarks>
+             **Тело запроса:**
+             ```json
+             {
+               "login": "string",
+               "email": "string",
+               "password": "string"
+             }
+             ```
+            
+             **Ответ:**
+             ```json
+             {
+               "id": "guid",
+               "login": "string",
+               "email": "string",
+               "role": "Admin|Creator|User",
+               "createdAt": "datetime"
+             }
+             ```
+            
+             **Ошибки:**
+             - **400 Bad Request**: Если данные невалидны
+             - **404 Not Found**: Если пользователь не найден
+             - **401 Unauthorized**: Если не прилогинились
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.UsersController.DeleteUser(System.Guid)">
+            <summary>
+            Удалить пользователя (только для администраторов)
+            </summary>
+            <remarks>
+            **Ошибки:**
+            - **404 Not Found**: Если пользователь не найден
+            - **401 Unauthorized**: Если не прилогинились
+            - **403 Forbidden**: Если пользователь не является администратором
+            </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.UsersController.Login(Excursion_GPT.Application.DTOs.UserLoginDto)">
+             <summary>
+             Аутентификация пользователя
+             </summary>
+             <remarks>
+             **Тело запроса:**
+             ```json
+             {
+               "login": "string",
+               "password": "string"
+             }
+             ```
+            
+             **Ответ:**
+             ```json
+             {
+               "token": "jwt_token",
+               "expiresIn": 3600,
+               "user": {
+                 "id": "guid",
+                 "login": "string",
+                 "email": "string",
+                 "role": "Admin|Creator|User"
+               }
+             }
+             ```
+            
+             **Ошибки:**
+             - **401 Unauthorized**: Если логин или пароль неверны
+             </remarks>
+        </member>
+        <member name="M:Excursion_GPT.Controllers.UsersController.Logout">
+             <summary>
+             Выход пользователя (операция на стороне клиента)
+             </summary>
+             <remarks>
+             Для JWT-аутентификации выход обычно обрабатывается на стороне клиента путем удаления токена.
+             Этот endpoint может использоваться для очистки на стороне сервера, если это необходимо (например, черный список токенов).
+            
+             **Ответ:**
+             ```json
+             {
+               "success": true,
+               "message": "Logout successful. Please discard your token client-side.",
+               "userId": "guid"
+             }
+             ```
+            
+             **Ошибки:**
+             - **401 Unauthorized**: Если не прилогинились
+             </remarks>
+        </member>
+    </members>
+</doc>

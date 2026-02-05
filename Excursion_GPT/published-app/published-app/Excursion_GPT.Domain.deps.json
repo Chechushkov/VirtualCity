@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v9.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v9.0": {
+      "Excursion_GPT.Domain/1.0.0": {
+        "runtime": {
+          "Excursion_GPT.Domain.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Excursion_GPT.Domain/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

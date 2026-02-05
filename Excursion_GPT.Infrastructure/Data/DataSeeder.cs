@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
+using BCrypt.Net;
 using Excursion_GPT.Domain.Entities;
 using Excursion_GPT.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -222,16 +225,16 @@ namespace Excursion_GPT.Infrastructure.Data
                 new Building
                 {
                     Id = Guid.Parse("10000000-0000-0000-0000-000000000001"),
-                    Latitude = 55.751244,
-                    Longitude = 37.618423,
+                    X = 4187663.692806,
+                    Z = 7509053.911078,
                     ModelId = null,
                     Rotation = null
                 },
                 new Building
                 {
                     Id = Guid.Parse("10000000-0000-0000-0000-000000000002"),
-                    Latitude = 55.755826,
-                    Longitude = 37.6173,
+                    X = 4187648.123456,
+                    Z = 7509200.654321,
                     ModelId = null,
                     Rotation = null
                 }
