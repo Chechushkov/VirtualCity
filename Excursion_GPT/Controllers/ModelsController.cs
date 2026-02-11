@@ -43,6 +43,7 @@ public class ModelsController : ControllerBase
     [HttpPost("upload")]
     [Authorize(Roles = "Admin,Creator")]
     [DisableRequestSizeLimit]
+    [Consumes("multipart/form-data")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ModelUploadResponseDto))]
     [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(AuthenticationErrorDto))]
     [ProducesResponseType(StatusCodes.Status403Forbidden, Type = typeof(RoleErrorDto))]
@@ -51,6 +52,11 @@ public class ModelsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status413PayloadTooLarge, Type = typeof(UploadErrorDto))]
     public async Task<ActionResult<ModelUploadResponseDto>> UploadModel([FromForm] ModelUploadRequestDto uploadDto)
     {
+        if (uploadDto.File == null || uploadDto.File.Length == 0)
+        {
+            return BadRequest("File is required");
+        }
+
         _logger.LogInformation("Uploading model file: {FileName}", uploadDto.File.FileName);
 
         try
@@ -105,6 +111,7 @@ public class ModelsController : ControllerBase
     [HttpPost("/upload")]
     [Authorize(Roles = "Admin,Creator")]
     [DisableRequestSizeLimit]
+    [Consumes("multipart/form-data")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ModelUploadResponseDto))]
     [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(AuthenticationErrorDto))]
     [ProducesResponseType(StatusCodes.Status403Forbidden, Type = typeof(RoleErrorDto))]
@@ -113,6 +120,11 @@ public class ModelsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status413PayloadTooLarge, Type = typeof(UploadErrorDto))]
     public async Task<ActionResult<ModelUploadResponseDto>> UploadModelDirect([FromForm] ModelUploadRequestDto uploadDto)
     {
+        if (uploadDto.File == null || uploadDto.File.Length == 0)
+        {
+            return BadRequest("File is required");
+        }
+
         _logger.LogInformation("Uploading model file via direct route: {FileName}", uploadDto.File.FileName);
 
         try

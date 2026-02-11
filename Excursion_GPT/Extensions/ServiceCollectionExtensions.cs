@@ -55,8 +55,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITrackService, TrackService>();
         services.AddScoped<IPointService, PointService>();
 
-        // Data Seeder
+        // Data Seeders
         services.AddScoped<BuildingDataSeeder>();
+        services.AddScoped<DataSeeder>();
 
         return services;
     }
@@ -134,7 +135,7 @@ public static class ServiceCollectionExtensions
                 Name = "Authorization",
                 In = ParameterLocation.Header,
                 Type = SecuritySchemeType.Http,
-                Scheme = "bearer",
+                Scheme = "Bearer",
                 BearerFormat = "JWT"
             });
 
@@ -160,6 +161,14 @@ public static class ServiceCollectionExtensions
             {
                 c.IncludeXmlComments(xmlPath);
             }
+
+            // Configure file upload support for Swagger
+            // Map IFormFile to Swagger file type
+            c.MapType<IFormFile>(() => new OpenApiSchema
+            {
+                Type = "string",
+                Format = "binary"
+            });
         });
 
         return services;

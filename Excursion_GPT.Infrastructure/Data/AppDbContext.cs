@@ -25,6 +25,7 @@ public class AppDbContext : DbContext
     public virtual DbSet<User> Users { get; set; } = null!;
     public virtual DbSet<Building> Buildings { get; set; } = null!;
     public virtual DbSet<Model> Models { get; set; } = null!;
+    public virtual DbSet<ModelFile> ModelFiles { get; set; } = null!;
     public virtual DbSet<Track> Tracks { get; set; } = null!;
     public virtual DbSet<Point> Points { get; set; } = null!;
 
@@ -102,6 +103,26 @@ public class AppDbContext : DbContext
                   .OnDelete(DeleteBehavior.Cascade); // If track deleted, delete points
         });
 
+        // ModelFile configuration
+        modelBuilder.Entity<ModelFile>(entity =>
+        {
+            entity.HasKey(mf => mf.Id);
+            entity.Property(mf => mf.MinioObjectName)
+                  .HasColumnName("minio_object_name")
+                  .IsRequired();
+            entity.Property(mf => mf.OriginalFileName)
+                  .HasColumnName("original_file_name")
+                  .IsRequired();
+            entity.Property(mf => mf.ContentType)
+                  .HasColumnName("content_type")
+                  .IsRequired();
+            entity.Property(mf => mf.FileSize)
+                  .HasColumnName("file_size")
+                  .IsRequired();
+            entity.Property(mf => mf.UploadedAt)
+                  .HasColumnName("uploaded_at")
+                  .IsRequired();
+        });
 
     }
     /*
