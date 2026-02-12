@@ -108,59 +108,80 @@ public class BuildingService : IBuildingService
                 }
             }
 
-            // Return building with actual polygon nodes if available
-            // Otherwise create a simple bounding box based on center point
-            object buildingResponse;
-
-            if (nodes != null && nodes.Count > 0)
+            // Check if building has a model
+            if (building.ModelId.HasValue)
             {
-                // Return building with actual polygon nodes
-                buildingResponse = new
+                // Return building with model information
+                var buildingResponse = new
                 {
                     id = building.Id.ToString(),
-                    nodes = nodes.Select(node =>
-                    {
-                        double nodeX = node[0]; // X coordinate
-                        double nodeZ = node[1]; // Z coordinate
-
-                        // If original request had negative X, return negative X for nodes too
-                        if (request.Position.X < 0)
-                        {
-                            nodeX = -nodeX;
-                        }
-                        return new { x = nodeX, z = nodeZ };
-                    }).ToList(),
+                    model = building.ModelId.Value.ToString("N"),
+                    x = responseX,
+                    z = building.Z,
+                    rot = building.Rotation ?? new List<double> { 0, 0, 0 },
                     address = building.Address,
                     height = building.Height
                 };
 
-                _logger.LogTrace("Building {Id} has {NodeCount} actual polygon nodes",
-                    building.Id, nodes.Count);
+                result.Add(buildingResponse);
+                _logger.LogTrace("Added building {Id} with model {ModelId} to response (X: {X}, Z: {Z}, Rotation: {Rotation})",
+                    building.Id, building.ModelId.Value, responseX, building.Z, building.Rotation);
             }
             else
             {
-                // Fallback to simple bounding box if no nodes stored
-                buildingResponse = new
+                // Return building with polygon nodes
+                object buildingResponse;
+
+                if (nodes != null && nodes.Count > 0)
                 {
-                    id = building.Id.ToString(),
-                    nodes = new[]
+                    // Return building with actual polygon nodes
+                    buildingResponse = new
                     {
-                        new { x = responseX, z = building.Z },
-                        new { x = responseX + 10.0, z = building.Z },
-                        new { x = responseX + 10.0, z = building.Z + 10.0 },
-                        new { x = responseX, z = building.Z + 10.0 }
-                    },
-                    address = building.Address,
-                    height = building.Height
-                };
+                        id = building.Id.ToString(),
+                        nodes = nodes.Select(node =>
+                        {
+                            double nodeX = node[0]; // X coordinate
+                            double nodeZ = node[1]; // Z coordinate
 
-                _logger.LogTrace("Building {Id} has no polygon nodes, using default 10x10 box",
-                    building.Id);
+                            // If original request had negative X, return negative X for nodes too
+                            if (request.Position.X < 0)
+                            {
+                                nodeX = -nodeX;
+                            }
+                            return new { x = nodeX, z = nodeZ };
+                        }).ToList(),
+                        address = building.Address,
+                        height = building.Height
+                    };
+
+                    _logger.LogTrace("Building {Id} has {NodeCount} actual polygon nodes",
+                        building.Id, nodes.Count);
+                }
+                else
+                {
+                    // Fallback to simple bounding box if no nodes stored
+                    buildingResponse = new
+                    {
+                        id = building.Id.ToString(),
+                        nodes = new[]
+                        {
+                            new { x = responseX, z = building.Z },
+                            new { x = responseX + 10.0, z = building.Z },
+                            new { x = responseX + 10.0, z = building.Z + 10.0 },
+                            new { x = responseX, z = building.Z + 10.0 }
+                        },
+                        address = building.Address,
+                        height = building.Height
+                    };
+
+                    _logger.LogTrace("Building {Id} has no polygon nodes, using default 10x10 box",
+                        building.Id);
+                }
+
+                result.Add(buildingResponse);
+                _logger.LogTrace("Added building {Id} to response (X: {X}, Z: {Z}, Address: {Address}, Height: {Height})",
+                    building.Id, responseX, building.Z, building.Address, building.Height);
             }
-
-            result.Add(buildingResponse);
-            _logger.LogTrace("Added building {Id} to response (X: {X}, Z: {Z}, Address: {Address}, Height: {Height})",
-                building.Id, responseX, building.Z, building.Address, building.Height);
         }
 
         _logger.LogInformation("Created response with {Count} buildings", result.Count);
@@ -174,7 +195,7 @@ public class BuildingService : IBuildingService
             double mockX = request.Position.X;
             double mockZ = request.Position.Z;
 
-            // Add mock standard buildings (with nodes) in Web Mercator coordinates
+            // Add mock standard building (with nodes) in Web Mercator coordinates
             result.Add(new
             {
                 id = "234234",
