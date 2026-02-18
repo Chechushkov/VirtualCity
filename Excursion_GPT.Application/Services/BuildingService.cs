@@ -56,6 +56,7 @@ public class BuildingService : IBuildingService
         double minZ = request.Position.Z - request.Distance;
         double maxZ = request.Position.Z + request.Distance;
 
+        // Query buildings with their associated models (if any)
         var buildingData = await _context.Buildings
             .Where(b => b.X >= minX && b.X <= maxX && b.Z >= minZ && b.Z <= maxZ)
             .Select(b => new
@@ -72,6 +73,39 @@ public class BuildingService : IBuildingService
             })
             .OrderBy(b => b.Distance) // Order by distance to return closest buildings first
             .ToListAsync();
+
+        // Get all model IDs from buildings that have models
+        var modelIds = buildingData
+            .Where(b => b.ModelId.HasValue)
+            .Select(b => b.ModelId.Value)
+            .Distinct()
+            .ToList();
+
+        // Load all models in one query
+        var models = modelIds.Any()
+            ? await _context.Models
+                .Where(m => modelIds.Contains(m.Id))
+                .ToDictionaryAsync(m => m.Id, m => m)
+            : new Dictionary<Guid, Domain.Entities.Model>();
+
+        // Load all model-polygon relationships for these models
+        Dictionary<Guid, List<Guid>> modelPolygonsDict = new Dictionary<Guid, List<Guid>>();
+        if (modelIds.Any())
+        {
+            var modelPolygons = await _context.ModelPolygons
+                .Where(mp => modelIds.Contains(mp.ModelId))
+                .Select(mp => new { mp.ModelId, mp.PolygonId })
+                .ToListAsync();
+
+            foreach (var mp in modelPolygons)
+            {
+                if (!modelPolygonsDict.ContainsKey(mp.ModelId))
+                {
+                    modelPolygonsDict[mp.ModelId] = new List<Guid>();
+                }
+                modelPolygonsDict[mp.ModelId].Add(mp.PolygonId);
+            }
+        }
 
         _logger.LogInformation("Found {Count} buildings within bounding box (X: {MinX}-{MaxX}, Z: {MinZ}-{MaxZ})",
             buildingData.Count, minX, maxX, minZ, maxZ);
@@ -94,23 +128,44 @@ public class BuildingService : IBuildingService
                 responseX = -responseX;
             }
 
-            // Parse NodesJson directly instead of using Nodes property
-            List<List<double>>? nodes = null;
+            // Parse NodesJson - for buildings without models, it should contain polygon coordinates
+            List<List<double>>? polygonNodes = null;
             if (!string.IsNullOrEmpty(building.NodesJson))
             {
                 try
                 {
-                    nodes = JsonSerializer.Deserialize<List<List<double>>>(building.NodesJson);
+                    polygonNodes = JsonSerializer.Deserialize<List<List<double>>>(building.NodesJson);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to deserialize NodesJson for building {Id}", building.Id);
+                    _logger.LogWarning(ex, "Failed to deserialize NodesJson as polygon coordinates for building {Id}", building.Id);
                 }
             }
 
             // Check if building has a model
             if (building.ModelId.HasValue)
             {
+                // Try to get model from loaded models
+                Domain.Entities.Model? model = null;
+                if (models.TryGetValue(building.ModelId.Value, out var loadedModel))
+                {
+                    model = loadedModel;
+                }
+
+                // Get polygon IDs for this model from model-polygons relationships
+                List<string>? modelPolygonIds = null;
+                if (model != null && modelPolygonsDict.TryGetValue(model.Id, out var polygonGuids))
+                {
+                    var polygonIds = polygonGuids.Select(g => g.ToString()).ToList();
+
+                    if (polygonIds.Any())
+                    {
+                        modelPolygonIds = polygonIds;
+                        _logger.LogDebug("Model {ModelId} has {Count} polygon relationships",
+                            model.Id, polygonIds.Count);
+                    }
+                }
+
                 // Return building with model information
                 var buildingResponse = new
                 {
@@ -120,25 +175,32 @@ public class BuildingService : IBuildingService
                     z = building.Z,
                     rot = building.Rotation ?? new List<double> { 0, 0, 0 },
                     address = building.Address,
-                    height = building.Height
+                    height = building.Height,
+                    polygons = modelPolygonIds, // Polygon IDs from model-polygons relationships
+                    modelMetadata = model != null ? new
+                    {
+                        position = model.Position,
+                        rotation = model.Rotation,
+                        scale = model.Scale
+                    } : null
                 };
 
                 result.Add(buildingResponse);
-                _logger.LogTrace("Added building {Id} with model {ModelId} to response (X: {X}, Z: {Z}, Rotation: {Rotation})",
-                    building.Id, building.ModelId.Value, responseX, building.Z, building.Rotation);
+                _logger.LogTrace("Added building {Id} with model {ModelId} to response (X: {X}, Z: {Z})",
+                    building.Id, building.ModelId.Value, responseX, building.Z);
             }
             else
             {
-                // Return building with polygon nodes
+                // Return building with polygon nodes (only for buildings without models)
                 object buildingResponse;
 
-                if (nodes != null && nodes.Count > 0)
+                if (polygonNodes != null && polygonNodes.Count > 0)
                 {
                     // Return building with actual polygon nodes
                     buildingResponse = new
                     {
                         id = building.Id.ToString(),
-                        nodes = nodes.Select(node =>
+                        nodes = polygonNodes.Select(node =>
                         {
                             double nodeX = node[0]; // X coordinate
                             double nodeZ = node[1]; // Z coordinate
@@ -155,7 +217,7 @@ public class BuildingService : IBuildingService
                     };
 
                     _logger.LogTrace("Building {Id} has {NodeCount} actual polygon nodes",
-                        building.Id, nodes.Count);
+                        building.Id, polygonNodes.Count);
                 }
                 else
                 {
@@ -163,24 +225,17 @@ public class BuildingService : IBuildingService
                     buildingResponse = new
                     {
                         id = building.Id.ToString(),
-                        nodes = new[]
-                        {
-                            new { x = responseX, z = building.Z },
-                            new { x = responseX + 10.0, z = building.Z },
-                            new { x = responseX + 10.0, z = building.Z + 10.0 },
-                            new { x = responseX, z = building.Z + 10.0 }
-                        },
+                        x = responseX,
+                        z = building.Z,
                         address = building.Address,
                         height = building.Height
                     };
 
-                    _logger.LogTrace("Building {Id} has no polygon nodes, using default 10x10 box",
+                    _logger.LogTrace("Building {Id} has no polygon nodes, using simple bounding box",
                         building.Id);
                 }
 
                 result.Add(buildingResponse);
-                _logger.LogTrace("Added building {Id} to response (X: {X}, Z: {Z}, Address: {Address}, Height: {Height})",
-                    building.Id, responseX, building.Z, building.Address, building.Height);
             }
         }
 

@@ -18,73 +18,6 @@ public class ModelsController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>
-    /// Загрузить на сервер модельку для здания
-    /// </summary>
-    /// <remarks>
-    /// **Параметры запроса:**
-    /// - `file`: Бинарный файл модели
-    ///
-    /// **Ответ:**
-    /// ```json
-    /// {
-    ///   "model": "model_id"
-    /// }
-    /// ```
-    /// Если в ответе не пришел ключ model (или получили не 2xx), значит, загрузить не удалось.
-    ///
-    /// **Ошибки:**
-    /// - **413 Payload Too Large**: Если загрузка не удалась (проблемы с хранилищем, еще что-нибудь)
-    /// - **404 Not Found**: Если указанное здание не найдено
-    /// - **404 Not Found**: Если указанная экскурсия не обнаружена
-    /// - **401 Unauthorized**: Если не прилогинились
-    /// - **403 Forbidden**: Если по роли не положено загружать
-    /// </remarks>
-    [HttpPost("upload")]
-    [Authorize(Roles = "Admin,Creator")]
-    [DisableRequestSizeLimit]
-    [Consumes("multipart/form-data")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ModelUploadResponseDto))]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized, Type = typeof(AuthenticationErrorDto))]
-    [ProducesResponseType(StatusCodes.Status403Forbidden, Type = typeof(RoleErrorDto))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(BuildingErrorDto))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(TrackErrorDto))]
-    [ProducesResponseType(StatusCodes.Status413PayloadTooLarge, Type = typeof(UploadErrorDto))]
-    public async Task<ActionResult<ModelUploadResponseDto>> UploadModel([FromForm] ModelUploadRequestDto uploadDto)
-    {
-        if (uploadDto.File == null || uploadDto.File.Length == 0)
-        {
-            return BadRequest("File is required");
-        }
-
-        _logger.LogInformation("Uploading model file: {FileName}", uploadDto.File.FileName);
-
-        try
-        {
-            var response = await _modelService.UploadModelAsync(uploadDto);
-            return Ok(response);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return Unauthorized(new AuthenticationErrorDto());
-        }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("role"))
-        {
-            return StatusCode(403, new RoleErrorDto());
-        }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("building"))
-        {
-            return NotFound(new BuildingErrorDto());
-        }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("track"))
-        {
-            return NotFound(new TrackErrorDto());
-        }
-        catch (Exception ex) when (ex.Message.Contains("upload") || ex is IOException)
-        {
-            return StatusCode(413, new UploadErrorDto());
-        }
-    }
 
     /// <summary>
     /// Загрузить на сервер модельку для здания (альтернативный маршрут: POST /upload)
@@ -92,6 +25,10 @@ public class ModelsController : ControllerBase
     /// <remarks>
     /// **Параметры запроса:**
     /// - `file`: Бинарный файл модели
+    /// - `polygons`: [опционально] Массив идентификаторов полигонов ["polygon1Id", "polygon2Id", ...]
+    /// - `address`: [опционально] Адрес здания
+    ///
+    /// **Примечание:** Можно указать либо `polygons` (идентификаторы полигонов), либо `address` (адрес здания), либо оба параметра. Если не указано ни одного, будет создано здание с placeholder-адресом.
     ///
     /// **Ответ:**
     /// ```json

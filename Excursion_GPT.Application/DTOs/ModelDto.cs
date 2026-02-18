@@ -56,6 +56,7 @@ public record ModelMetadataUpdateRequestDto
     public double? Scale { get; init; }
     public List<string>? Polygons { get; init; } // [polygon1Id, polygon2Id, ...]
     public string? Address { get; init; }
+    public Guid? BuildingId { get; init; } // Optional: link model to existing building
 }
 
 // Error DTOs for models

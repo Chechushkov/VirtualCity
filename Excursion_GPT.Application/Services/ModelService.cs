@@ -272,6 +272,7 @@ public class ModelService : IModelService
     public async Task SaveModelMetadataAsync(string modelId, ModelMetadataUpdateRequestDto request)
     {
         _logger.LogInformation("Saving metadata for model ID: {ModelId}", modelId);
+        _logger.LogInformation("DEBUG: SaveModelMetadataAsync called for model {ModelId}", modelId);
 
         if (string.IsNullOrWhiteSpace(modelId))
         {
@@ -285,9 +286,10 @@ public class ModelService : IModelService
             throw new InvalidOperationException("Model not found");
         }
 
-        // Find model in database
+        // Find model in database with related data
         var model = await _context.Models
             .Include(m => m.Building)
+            .Include(m => m.ModelPolygons)
             .FirstOrDefaultAsync(m => m.Id == modelGuid);
 
         if (model == null)
@@ -304,20 +306,134 @@ public class ModelService : IModelService
 
         try
         {
-            // Update building associated with the model if it exists
-            if (model.Building != null)
+            _logger.LogInformation("DEBUG: Processing request with polygons: {HasPolygons}", request.Polygons != null);
+
+            // STEP 1: Handle polygons if provided
+            if (request.Polygons != null && request.Polygons.Any())
+            {
+                _logger.LogInformation("Processing {PolygonCount} polygons for model {ModelId}", request.Polygons.Count, modelId);
+                _logger.LogInformation("DEBUG: Found {PolygonCount} polygons to process", request.Polygons.Count);
+
+                // Clear existing polygon relationships for this model
+                var existingPolygons = model.ModelPolygons.ToList();
+                if (existingPolygons.Any())
+                {
+                    _logger.LogInformation("DEBUG: Removing {Count} existing polygon relationships", existingPolygons.Count);
+                    _context.ModelPolygons.RemoveRange(existingPolygons);
+                    _logger.LogInformation("Removed {Count} existing polygon relationships for model {ModelId}",
+                        existingPolygons.Count, modelId);
+                }
+
+                // Process each polygon
+                foreach (var polygonIdStr in request.Polygons)
+                {
+                    if (Guid.TryParse(polygonIdStr, out var polygonId))
+                    {
+                        // Verify the polygon (building) exists
+                        var buildingExists = await _context.Buildings.AnyAsync(b => b.Id == polygonId);
+                        if (!buildingExists)
+                        {
+                            _logger.LogWarning("Polygon (building) with ID {PolygonId} does not exist, skipping", polygonId);
+                            continue;
+                        }
+
+                        // CRITICAL: Remove any existing relationships for this polygon with OTHER models
+                        // This ensures one polygon has only one model
+                        _logger.LogInformation("DEBUG: Checking for existing relationships for polygon {PolygonId}", polygonId);
+                        var existingRelationships = await _context.ModelPolygons
+                            .Where(mp => mp.PolygonId == polygonId && mp.ModelId != modelGuid)
+                            .ToListAsync();
+
+                        if (existingRelationships.Any())
+                        {
+                            _logger.LogInformation("DEBUG: Found {Count} existing relationships to remove", existingRelationships.Count);
+                            _context.ModelPolygons.RemoveRange(existingRelationships);
+                            _logger.LogInformation("Removed {Count} existing polygon relationships for polygon {PolygonId} with other models",
+                                existingRelationships.Count, polygonId);
+                        }
+                        else
+                        {
+                            _logger.LogInformation("DEBUG: No existing relationships found for polygon {PolygonId}", polygonId);
+                        }
+
+                        // Clear modelId from the building if it was pointing to a different model
+                        _logger.LogInformation("DEBUG: Getting building {PolygonId} to update modelid", polygonId);
+                        var buildingToUpdate = await _context.Buildings.FindAsync(polygonId);
+                        if (buildingToUpdate != null)
+                        {
+                            _logger.LogInformation("DEBUG: Building found. Current modelid: {ModelId}", buildingToUpdate.ModelId);
+                            if (buildingToUpdate.ModelId.HasValue && buildingToUpdate.ModelId.Value != modelGuid)
+                            {
+                                _logger.LogInformation("DEBUG: Clearing modelid from building {PolygonId}", polygonId);
+                                buildingToUpdate.ModelId = null;
+                                _context.Buildings.Update(buildingToUpdate);
+                                _logger.LogInformation("Cleared modelId from building {BuildingId} that was pointing to other model", polygonId);
+                            }
+                        }
+                        else
+                        {
+                            _logger.LogInformation("DEBUG: Building {PolygonId} not found", polygonId);
+                        }
+
+                        // Create new relationship
+                        _logger.LogInformation("DEBUG: Creating new model_polygons relationship");
+                        var modelPolygon = new Domain.Entities.ModelPolygon
+                        {
+                            ModelId = modelGuid,
+                            PolygonId = polygonId
+                        };
+
+                        await _context.ModelPolygons.AddAsync(modelPolygon);
+                        _logger.LogInformation("DEBUG: Added model_polygons relationship: {ModelGuid} -> {PolygonId}", modelGuid, polygonId);
+                        _logger.LogInformation("Added polygon relationship: Model {ModelId} -> Polygon {PolygonId}", modelId, polygonId);
+
+                        // Update model's buildingid to point to this polygon (first polygon is primary)
+                        if (model.BuildingId != polygonId)
+                        {
+                            _logger.LogInformation("DEBUG: Updating model.BuildingId from {OldBuildingId} to {PolygonId}", model.BuildingId, polygonId);
+                            model.BuildingId = polygonId;
+                            _logger.LogInformation("Updated model.BuildingId to {PolygonId}", polygonId);
+                        }
+                        else
+                        {
+                            _logger.LogInformation("DEBUG: model.BuildingId already set to {PolygonId}", polygonId);
+                        }
+
+                        // Update building's modelid to point to this model
+                        if (buildingToUpdate != null)
+                        {
+                            _logger.LogInformation("DEBUG: Setting building.ModelId to {ModelGuid}", modelGuid);
+                            buildingToUpdate.ModelId = modelGuid;
+                            _context.Buildings.Update(buildingToUpdate);
+                            _logger.LogInformation("Updated building.ModelId to {ModelId} for building {BuildingId}", modelId, polygonId);
+                        }
+                        else
+                        {
+                            _logger.LogInformation("DEBUG: buildingToUpdate is null, cannot set modelid");
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Invalid polygon ID format: {PolygonId}, skipping", polygonIdStr);
+                    }
+                }
+            }
+
+            // STEP 2: Update building position and other metadata
+            var buildingToUpdateMetadata = model.Building;
+            if (buildingToUpdateMetadata != null)
             {
                 // Update building position (X and Z coordinates)
                 if (request.Position != null)
                 {
-                    model.Building.X = request.Position[0];
-                    model.Building.Z = request.Position[2]; // Position[1] is 0 (y-axis)
+                    buildingToUpdateMetadata.X = request.Position[0];
+                    buildingToUpdateMetadata.Z = request.Position[2]; // Position[1] is 0 (y-axis)
                 }
 
                 // Update building address if provided
                 if (!string.IsNullOrWhiteSpace(request.Address))
                 {
-                    model.Building.Address = request.Address;
+                    buildingToUpdateMetadata.Address = request.Address;
                 }
 
                 // Update building rotation if provided
@@ -325,29 +441,47 @@ public class ModelService : IModelService
                 {
                     // Convert single rotation angle to [x, y, z] format
                     // Assuming rotation around Y-axis (vertical axis)
-                    model.Building.Rotation = new List<double> { 0, request.Rotation.Value, 0 };
+                    buildingToUpdateMetadata.Rotation = new List<double> { 0, request.Rotation.Value, 0 };
                 }
 
-                // Update polygons if provided
-                if (request.Polygons != null)
-                {
-                    // Convert polygons list to JSON string
-                    var polygonsJson = System.Text.Json.JsonSerializer.Serialize(request.Polygons);
-                    model.Building.NodesJson = polygonsJson;
-                }
+                _context.Buildings.Update(buildingToUpdateMetadata);
+            }
 
-                _context.Buildings.Update(model.Building);
+            // STEP 3: Update model fields
+            bool modelUpdated = false;
+
+            // Update model position if provided
+            if (request.Position != null)
+            {
+                model.Position = request.Position;
+                modelUpdated = true;
+            }
+
+            // Update model rotation if provided
+            if (request.Rotation.HasValue)
+            {
+                // Convert single rotation angle to [x, y, z] format for model
+                model.Rotation = new List<double> { 0, request.Rotation.Value, 0 };
+                modelUpdated = true;
             }
 
             // Update model scale if provided
             if (request.Scale.HasValue)
             {
                 model.Scale = request.Scale.Value;
+                modelUpdated = true;
+            }
+
+            // Update model in database if any fields were changed
+            if (modelUpdated)
+            {
                 _context.Models.Update(model);
             }
 
             // Save all changes to database
+            _logger.LogInformation("DEBUG: Saving changes to database");
             await _context.SaveChangesAsync();
+            _logger.LogInformation("DEBUG: Changes saved successfully");
 
             _logger.LogInformation("Model metadata saved successfully: {ModelId}", modelId);
         }

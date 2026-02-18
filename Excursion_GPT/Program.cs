@@ -14,6 +14,7 @@ using Minio;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+var logger = builder.Services.BuildServiceProvider().GetRequiredService<ILogger<Program>>();
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -66,25 +67,63 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/health");
 
-// Seed database on startup
+// Apply database migrations BEFORE any other database operations
+logger.LogInformation("=== Starting database initialization ===");
+
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
+    var scopeLogger = services.GetRequiredService<ILogger<Program>>();
+
     try
     {
         var context = services.GetRequiredService<AppDbContext>();
-        var logger = services.GetRequiredService<ILogger<Program>>();
+
+        // First, ensure database exists and apply migrations
+        scopeLogger.LogInformation("Step 1: Checking database connection...");
+        bool canConnect = await context.Database.CanConnectAsync();
+        scopeLogger.LogInformation($"Database connection: {(canConnect ? "OK" : "Cannot connect")}");
+
+        scopeLogger.LogInformation("Step 2: Applying database migrations...");
+        try
+        {
+            // Get pending migrations
+            var pendingMigrations = await context.Database.GetPendingMigrationsAsync();
+            if (pendingMigrations.Any())
+            {
+                scopeLogger.LogInformation($"Found {pendingMigrations.Count()} pending migrations:");
+                foreach (var migration in pendingMigrations)
+                {
+                    scopeLogger.LogInformation($"  - {migration}");
+                }
+
+                // Apply migrations
+                await context.Database.MigrateAsync();
+                scopeLogger.LogInformation("Database migrations applied successfully");
+            }
+            else
+            {
+                scopeLogger.LogInformation("No pending migrations found");
+            }
+        }
+        catch (Exception migrateEx)
+        {
+            scopeLogger.LogError(migrateEx, "Failed to apply database migrations");
+            throw;
+        }
+
+        scopeLogger.LogInformation("Step 3: Seeding initial data...");
 
         // Try to seed using DataSeeder first
         try
         {
             var dataSeeder = services.GetRequiredService<DataSeeder>();
             await dataSeeder.SeedAsync();
-            logger.LogInformation("DataSeeder completed successfully");
+            scopeLogger.LogInformation("DataSeeder completed successfully");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "DataSeeder failed, creating users directly");
+            scopeLogger.LogError(ex, "DataSeeder failed, creating users directly");
 
             // Fallback: create users directly
             var adminUser = await context.Users.FindAsync(Guid.Parse("00000000-0000-0000-0000-000000000001"));
@@ -101,7 +140,7 @@ using (var scope = app.Services.CreateScope())
                     Role = Excursion_GPT.Domain.Enums.Role.Admin
                 };
                 await context.Users.AddAsync(adminUser);
-                logger.LogInformation("Created admin user");
+                scopeLogger.LogInformation("Created admin user");
             }
 
             var creatorUser = await context.Users.FindAsync(Guid.Parse("00000000-0000-0000-0000-000000000002"));
@@ -118,16 +157,19 @@ using (var scope = app.Services.CreateScope())
                     Role = Excursion_GPT.Domain.Enums.Role.Creator
                 };
                 await context.Users.AddAsync(creatorUser);
-                logger.LogInformation("Created creator user");
+                scopeLogger.LogInformation("Created creator user");
             }
 
             await context.SaveChangesAsync();
         }
+
+        scopeLogger.LogInformation("=== Database initialization completed successfully ===");
     }
     catch (Exception ex)
     {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while seeding the database.");
+        scopeLogger.LogError(ex, "=== Database initialization FAILED ===");
+        // Don't rethrow - let the application start even if seeding fails
+        // but log the error clearly
     }
 }
 

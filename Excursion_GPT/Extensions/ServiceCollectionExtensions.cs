@@ -139,6 +139,7 @@ public static class ServiceCollectionExtensions
                 BearerFormat = "JWT"
             });
 
+            // Add global security requirement for Bearer token
             c.AddSecurityRequirement(new OpenApiSecurityRequirement
             {
                 {

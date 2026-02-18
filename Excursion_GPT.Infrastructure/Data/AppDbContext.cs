@@ -28,6 +28,7 @@ public class AppDbContext : DbContext
     public virtual DbSet<ModelFile> ModelFiles { get; set; } = null!;
     public virtual DbSet<Track> Tracks { get; set; } = null!;
     public virtual DbSet<Point> Points { get; set; } = null!;
+    public virtual DbSet<ModelPolygon> ModelPolygons { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -77,6 +78,10 @@ public class AppDbContext : DbContext
                   .WithMany(t => t.Models)
                   .HasForeignKey(m => m.TrackId)
                   .OnDelete(DeleteBehavior.Cascade); // If track deleted, delete model
+            entity.HasMany(m => m.ModelPolygons)
+                  .WithOne(mp => mp.Model)
+                  .HasForeignKey(mp => mp.ModelId)
+                  .OnDelete(DeleteBehavior.Cascade); // If model deleted, delete its polygon relationships
         });
 
         // Track configuration
@@ -122,6 +127,36 @@ public class AppDbContext : DbContext
             entity.Property(mf => mf.UploadedAt)
                   .HasColumnName("uploaded_at")
                   .IsRequired();
+        });
+
+        // ModelPolygon configuration
+        modelBuilder.Entity<ModelPolygon>(entity =>
+        {
+            entity.HasKey(mp => mp.Id);
+            entity.Property(mp => mp.ModelId)
+                  .HasColumnName("model_id")
+                  .IsRequired();
+            entity.Property(mp => mp.PolygonId)
+                  .HasColumnName("polygon_id")
+                  .IsRequired();
+            entity.Property(mp => mp.CreatedAt)
+                  .HasColumnName("created_at")
+                  .IsRequired()
+                  .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(mp => mp.Model)
+                  .WithMany(m => m.ModelPolygons)
+                  .HasForeignKey(mp => mp.ModelId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(mp => mp.Polygon)
+                  .WithMany()
+                  .HasForeignKey(mp => mp.PolygonId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            // Unique constraint to prevent duplicate relationships
+            entity.HasIndex(mp => new { mp.ModelId, mp.PolygonId })
+                  .IsUnique();
         });
 
     }
