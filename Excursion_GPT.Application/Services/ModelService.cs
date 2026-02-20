@@ -179,18 +179,130 @@ public class ModelService : IModelService
             model.Rotation = updateDto.Rotation;
             model.Scale = updateDto.Scale;
 
-            // Save changes to database
-            _context.Models.Update(model);
-            await _context.SaveChangesAsync();
+            // Handle polygons if provided
+            if (updateDto.Polygons != null && updateDto.Polygons.Any())
+            {
+                _logger.LogInformation("Processing {PolygonCount} polygons for model {ModelId}", updateDto.Polygons.Count, modelId);
 
-            _logger.LogInformation("Model position updated successfully: {ModelId}", modelId);
+                // Clear existing polygon relationships for this model
+                var existingPolygons = await _context.ModelPolygons
+                    .Where(mp => mp.ModelId == modelGuid)
+                    .ToListAsync();
+
+                if (existingPolygons.Any())
+                {
+                    _context.ModelPolygons.RemoveRange(existingPolygons);
+                    _logger.LogInformation("Removed {Count} existing polygon relationships for model {ModelId}",
+                        existingPolygons.Count, modelId);
+                }
+
+                // Clear modelid from buildings that were linked to this model
+                // Use a new instance for each building to update only ModelId
+                var buildingIdsToClear = await _context.Buildings
+                    .Where(b => b.ModelId == modelGuid)
+                    .Select(b => b.Id)
+                    .ToListAsync();
+
+                foreach (var buildingId in buildingIdsToClear)
+                {
+                    var buildingToClear = new Domain.Entities.Building
+                    {
+                        Id = buildingId,
+                        ModelId = null
+                    };
+                    _context.Buildings.Attach(buildingToClear);
+                    _context.Entry(buildingToClear).Property(b => b.ModelId).IsModified = true;
+                }
+
+                // Process each polygon
+                foreach (var polygonIdStr in updateDto.Polygons)
+                {
+                    if (Guid.TryParse(polygonIdStr, out var polygonId))
+                    {
+                        // Verify the polygon (building) exists
+                        var buildingExists = await _context.Buildings.AnyAsync(b => b.Id == polygonId);
+                        if (!buildingExists)
+                        {
+                            _logger.LogWarning("Polygon (building) with ID {PolygonId} does not exist, skipping", polygonId);
+                            continue;
+                        }
+
+                        // Remove any existing relationships for this polygon with OTHER models
+                        var existingRelationships = await _context.ModelPolygons
+                            .Where(mp => mp.PolygonId == polygonId && mp.ModelId != modelGuid)
+                            .ToListAsync();
+
+                        if (existingRelationships.Any())
+                        {
+                            _context.ModelPolygons.RemoveRange(existingRelationships);
+                            _logger.LogInformation("Removed {Count} existing polygon relationships for polygon {PolygonId} with other models",
+                                existingRelationships.Count, polygonId);
+                        }
+
+                        // Clear modelid from the building if it was pointing to a different model
+                        // Use AsNoTracking to prevent entity tracking and address overwrite
+                        var building = await _context.Buildings
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(b => b.Id == polygonId);
+                        if (building != null && building.ModelId.HasValue && building.ModelId.Value != modelGuid)
+                        {
+                            // Create a new instance to update only ModelId
+                            var buildingToClear = new Domain.Entities.Building
+                            {
+                                Id = polygonId,
+                                ModelId = null
+                            };
+                            _context.Buildings.Attach(buildingToClear);
+                            _context.Entry(buildingToClear).Property(b => b.ModelId).IsModified = true;
+                        }
+
+                        // Create new relationship
+                        var modelPolygon = new Domain.Entities.ModelPolygon
+                        {
+                            ModelId = modelGuid,
+                            PolygonId = polygonId
+                        };
+
+                        await _context.ModelPolygons.AddAsync(modelPolygon);
+                        _logger.LogInformation("Added polygon relationship: Model {ModelId} -> Polygon {PolygonId}", modelId, polygonId);
+
+                        // Update model's buildingid to point to the first polygon in the list
+                        if (updateDto.Polygons.IndexOf(polygonIdStr) == 0)
+                        {
+                            model.BuildingId = polygonId;
+                            _logger.LogInformation("Updated model.BuildingId to {PolygonId}", polygonId);
+                        }
+
+                        // Update building's modelid to point to this model
+                        // Create a new instance to update only ModelId
+                        var buildingToUpdate = new Domain.Entities.Building
+                        {
+                            Id = polygonId,
+                            ModelId = modelGuid
+                        };
+                        _context.Buildings.Attach(buildingToUpdate);
+                        _context.Entry(buildingToUpdate).Property(b => b.ModelId).IsModified = true;
+                        _logger.LogInformation("Updated building.ModelId to {ModelId} for building {BuildingId}", modelId, polygonId);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Invalid polygon ID format: {PolygonId}, skipping", polygonIdStr);
+                    }
+                }
+            }
+
+            // Save all changes to database
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Model position and metadata updated successfully: {ModelId}", modelId);
 
             return new ModelUpdateResponseDto
             {
                 Id = modelId,
                 Position = model.Position,
                 Rotation = model.Rotation,
-                Scale = model.Scale
+                Scale = model.Scale,
+                Polygons = updateDto.Polygons,
+                Address = updateDto.Address
             };
         }
         catch (Exception ex)
@@ -419,32 +531,46 @@ public class ModelService : IModelService
                 }
             }
 
-            // STEP 2: Update building position and other metadata
+            // Update building position and other metadata
             var buildingToUpdateMetadata = model.Building;
             if (buildingToUpdateMetadata != null)
             {
-                // Update building position (X and Z coordinates)
+                // Create a new instance with only the fields we want to update
+                var buildingUpdate = new Domain.Entities.Building
+                {
+                    Id = buildingToUpdateMetadata.Id
+                };
+
                 if (request.Position != null)
                 {
-                    buildingToUpdateMetadata.X = request.Position[0];
-                    buildingToUpdateMetadata.Z = request.Position[2]; // Position[1] is 0 (y-axis)
+                    buildingUpdate.X = request.Position[0];
+                    buildingUpdate.Z = request.Position[2]; // Position[1] is 0 (y-axis)
                 }
 
-                // Update building address if provided
-                if (!string.IsNullOrWhiteSpace(request.Address))
-                {
-                    buildingToUpdateMetadata.Address = request.Address;
-                }
-
-                // Update building rotation if provided
                 if (request.Rotation.HasValue)
                 {
                     // Convert single rotation angle to [x, y, z] format
                     // Assuming rotation around Y-axis (vertical axis)
-                    buildingToUpdateMetadata.Rotation = new List<double> { 0, request.Rotation.Value, 0 };
+                    buildingUpdate.Rotation = new List<double> { 0, request.Rotation.Value, 0 };
                 }
 
-                _context.Buildings.Update(buildingToUpdateMetadata);
+                _context.Buildings.Attach(buildingUpdate);
+
+                // Only mark specific fields as modified to prevent overwriting address
+                if (request.Position != null)
+                {
+                    _context.Entry(buildingUpdate).Property(b => b.X).IsModified = true;
+                    _context.Entry(buildingUpdate).Property(b => b.Z).IsModified = true;
+                }
+                if (request.Rotation.HasValue)
+                {
+                    _context.Entry(buildingUpdate).Property(b => b.Rotation).IsModified = true;
+                }
+                // Explicitly mark Address as not modified to prevent overwriting
+                _context.Entry(buildingUpdate).Property(b => b.Address).IsModified = false;
+
+                // Note: Building address is not updated here to preserve original address data
+                // Address in request is for informational purposes only
             }
 
             // STEP 3: Update model fields

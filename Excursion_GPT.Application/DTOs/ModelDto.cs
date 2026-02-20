@@ -21,6 +21,8 @@ public record ModelUpdateRequestDto
     public List<double> Position { get; init; } = new(); // [x, y, z]
     public List<double> Rotation { get; init; } = new(); // [a, b, c]
     public double Scale { get; init; } = 1.0;
+    public List<string>? Polygons { get; init; } // [polygon1Id, polygon2Id, ...]
+    public string? Address { get; init; }
 }
 
 // Response DTO for PUT /model/:model_id
@@ -30,6 +32,8 @@ public record ModelUpdateResponseDto
     public List<double> Position { get; init; } = new(); // [lat, y, lng]
     public List<double> Rotation { get; init; } = new(); // [a, b, c]
     public double Scale { get; init; } = 1.0;
+    public List<string>? Polygons { get; init; } // [polygon1Id, polygon2Id, ...]
+    public string? Address { get; init; }
 }
 
 // Request DTO for PUT /models/address - Get model metadata by address

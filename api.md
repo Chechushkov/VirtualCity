@@ -135,6 +135,8 @@ body:
   position: [x, y, z],
   rotation: [a, b, c]
   scale: number
+  polygons: [polygon1_id, polygon2_id, ...]  # Optional: List of building IDs to link model to
+  address: string  # Optional: Building address
 ```
 
 #### Ответ
@@ -143,11 +145,15 @@ body:
   "id": "model_id",
   "position": [lat, y, lng], // возможно, lat и lng еще местами поменяются, будем смотреть
   "rotation": [a, b, c],
-  "scale": 1.0 // Ну или что там выставили
+  "scale": 1.0, // Ну или что там выставили
+  "polygons": [polygon1_id, polygon2_id, ...], // Optional: List of building IDs the model is linked to
+  "address": "string" // Optional: Building address
 }
 ```
 
 _Т.е. получив ответ, снова переустанавливаем, куда попало здание. Если сохранить новое положение не получилось, это будет заметно._
+
+**Примечание:** При указании поля `polygons` модель будет связана с указанными зданиями (полигонами). Существующие связи модели с другими зданиями будут удалены. Каждое здание может быть связано только с одной моделью. При обновлении связей также обновляется адрес здания, если указано поле `address`.
 
 #### Ошибки
 
